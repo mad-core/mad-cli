@@ -1,6 +1,133 @@
 # CHANGELOG
 
 
+## v0.4.0 (2026-07-04)
+
+### Documentation
+
+- Document named environment profiles
+  ([`6bbf294`](https://github.com/mad-core/mad-cli/commit/6bbf294ecf112993235a5a32719f1731b44ebf61))
+
+Update the living-docs for `mad profiles` and `mad install --profile`: cli.md (new profiles command
+  family + --profile row), components.md (the new core/profiles.py and commands/profiles.py
+  modules), configuration.md (profiles storage + precedence), installation.md (--profile),
+  cli-design.md (masking + restart hint), testing-strategy.md (new test modules); regenerate the
+  deterministic source-tree/test-tree; re-acknowledge the affected docs.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01GWHBALtjHVd176YddWc9YP
+
+Signed-off-by: Jose Salamanca <jose.salamancacoy@gmail.com>
+
+- Document the HTTP API, service mode and the use-case layer
+  ([`a1fc77e`](https://github.com/mad-core/mad-cli/commit/a1fc77ec9941692c70483a92b4bb8c7a5bda687d))
+
+Add docs/03-contracts/http-api.md (routes, bearer auth, always-masked secrets, error mapping, the
+  synchronous-MVP limitation) and register it in the manifest. Extend cli.md with `mad serve` / `mad
+  service`, README with the `server` extra and the auto-provisioned server venv, and refresh the
+  architecture/convention pages for the new use-case layer, the server package, service-mode config
+  (api-token, server-venv) and the optional fastapi/uvicorn deps. Regenerate the deterministic
+  source/test trees and bump the manifest acknowledgements.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01GWHBALtjHVd176YddWc9YP
+
+Signed-off-by: Jose Salamanca <jose.salamancacoy@gmail.com>
+
+- Re-ack installation.md after server-extra coverage
+  ([`a2da5f9`](https://github.com/mad-core/mad-cli/commit/a2da5f9cda21db3af53d4fa8855e6a9e767df135))
+
+The page already documents the [server] extra and mad service flow; its acknowledgement lagged the
+  commit that changed its trigger paths.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01GWHBALtjHVd176YddWc9YP
+
+Signed-off-by: Jose Salamanca <jose.salamancacoy@gmail.com>
+
+### Features
+
+- **cli**: Local HTTP API with CLI parity and mad service mode
+  ([`09f30e1`](https://github.com/mad-core/mad-cli/commit/09f30e16b25a5534f2b87c64e7fa0774cbd9ca69))
+
+Expose every CLI capability over a local HTTP API so a UI/dashboard can build on the same use cases.
+  Shipped as an optional `server` extra (fastapi + uvicorn) so the base CLI stays a two-dependency
+  package — `import mad_cli.app` never pulls in FastAPI. The FastAPI routes are thin adapters over
+  core.usecases, giving OpenAPI for free and parity with the CLI by construction.
+
+Security: binds 127.0.0.1 by default; a bearer token is auto-generated at config_root()/api-token
+  (0600) and required on every route except /health; a non-loopback --host prints a loud warning.
+  Secret values are always masked on reads — no reveal flag exists on the API.
+
+Service mode: `mad serve` runs the API in the foreground; `mad service
+  install|uninstall|status|update` manages a boot-persistent service (systemd user unit on Linux,
+  launchd LaunchAgent on macOS) rendered from packaged templates. When the server extra is not
+  importable, `mad service install` auto-provisions a dedicated venv under config_root()/server-venv
+  (from PyPI, or a local wheel via --wheel) and points ExecStart at it. `--render-to PATH` writes
+  the unit/plist without touching systemctl/launchctl.
+
+MVP limitation: install-with-start, start and update run synchronously.
+
+Closes #11
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01GWHBALtjHVd176YddWc9YP
+
+Signed-off-by: Jose Salamanca <jose.salamancacoy@gmail.com>
+
+- **cli**: Named environment profiles for install and config
+  ([`bd1131b`](https://github.com/mad-core/mad-cli/commit/bd1131b18aa04db77b77343ad01f0ee7bfff68a0))
+
+Add reusable, named sets of .env values ("profiles") so operators can stamp consistent credentials
+  and tuning across instances and servers.
+
+- core/profiles.py: framework-free storage at config_root()/profiles/<name>.env via EnvFile (chmod
+  0600), with list/load/save/delete, name validation and the IDENTITY_KEYS set a profile never
+  carries (MAD_INSTANCE, MAD_HOST_PORT, PUID, PGID, MAD_DATA_PATH, MAD_VERSION). -
+  commands/profiles.py: `mad profiles create|list|show|delete|apply`. create seeds from an instance
+  (identity keys excluded) and/or --set KEY=VALUE; show masks secret-looking values; apply overlays
+  a profile onto an instance's .env with a restart hint. - install.py: `mad install --profile NAME`
+  feeds the profile's values as the wizard defaults (precedence: explicit flag > profile > builtin
+  default), merged into the single existing default layer.
+
+Closes #10
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01GWHBALtjHVd176YddWc9YP
+
+Signed-off-by: Jose Salamanca <jose.salamancacoy@gmail.com>
+
+### Refactoring
+
+- Extract framework-free use-case layer
+  ([`5589ab8`](https://github.com/mad-core/mad-cli/commit/5589ab86c55f6bae64908ba505df153969b36493))
+
+Move the orchestration that lived in commands/*.py into a framework-free use-case layer
+  (mad_cli.core.usecases): instances, lifecycle, configvals, keys, versions, adopt and install, plus
+  a shared error vocabulary. The Typer commands become thin adapters over these use cases
+  (parse/prompt/present only), so the CLI and the forthcoming HTTP API cannot drift.
+
+Secret detection (is_secret_key) and a display_value helper move into core.keyspec so both surfaces
+  share one masking rule; commands/_common.py re-exports it. The status-line helpers now escape
+  their message text so literal brackets (e.g. an [A-Z][A-Z0-9_]* pattern) are printed verbatim
+  instead of being swallowed as rich markup.
+
+The existing command tests stay the behavioural safety net: only the mock targets moved to the new
+  module locations; no assertion was weakened. CONTRACTS.md gains the core.usecases + keyspec +
+  (upcoming) server sections.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01GWHBALtjHVd176YddWc9YP
+
+Signed-off-by: Jose Salamanca <jose.salamancacoy@gmail.com>
+
+
 ## v0.3.2 (2026-07-04)
 
 ### Chores
