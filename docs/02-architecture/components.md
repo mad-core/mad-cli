@@ -18,6 +18,7 @@ The framework-free engine. Never imports `typer`/`rich`; type-checked with `mypy
 | `envfile.py` | `EnvFile`: a tolerant `.env` parser that preserves comments, order, and blank lines, with a byte-stable round-trip and `get`/`set`/`unset`/`keys`/`save`. |
 | `instance.py` | The `Instance` dataclass (name, config_dir, env, legacy) with typed accessors — `host_port` (`MAD_HOST_PORT`), `data_path` (`MAD_DATA_PATH`), `version_pin` (`MAD_VERSION`), `compose_file`, `env_file`; `discover_instances()` (modern `instances/*/.env` first, then the legacy top-level layout); `get_instance(name)` (raises `InstanceNotFoundError`); `default_instance()` (the sole instance, else `None`). |
 | `keyspec.py` | `KeySpec` plus the `BUILTIN_KEYS` registry (`claude-oauth`, `anthropic`, `github`, `deepseek`, `linear`, `opencode`); `mask(value)`. |
+| `profiles.py` | Named environment profiles stored one file per profile at `config_root()/profiles/<name>.env` (`chmod 600`): `list_profiles`/`load_profile`/`save_profile`/`delete_profile` (raise `ProfileNotFoundError`), name validation (the instance-name rule), and `IDENTITY_KEYS` — the instance-identity keys a profile never carries. |
 | `claude_creds.py` | `write_claude_credentials(claude_dir, token)` writes `.credentials.json` (the `claudeAiOauth` format), `chmod 600`. |
 | `templates.py` | `RenderContext` plus `render_all()` / `write_instance_files()` render the three packaged `*.tmpl`; `EDGE_PACKAGE` defaults to `mad-edge`; the container start binary is resolved in Python (`mad-edge`, or `mad` for the `mad-bros` package). |
 | `compose.py` | `ComposeRunner`: the one module that shells out to Docker. Every argv is scoped `docker compose -p mad-<name> -f <compose.yml> --env-file <.env> <verb>`; methods `up`/`down`/`restart`/`ps`/`logs`/`shell`/`config_check`/`build`/`exec`/`wait_healthy`; `dry_run` records the argv on `last_command` without executing. |
@@ -47,6 +48,7 @@ The Typer surface. Never touches `subprocess` or the filesystem directly — eve
 | `instances.py` | The inventory commands: `list`, `info`, `adopt`. |
 | `keys.py` | The `mad keys` sub-app: `set`, `list`, `remove`. |
 | `config.py` | The `mad config` sub-app: `get`, `set`, `unset` — the general-purpose `.env` editor. |
+| `profiles.py` | The `mad profiles` sub-app: `create`, `list`, `show`, `delete`, `apply` — reusable named environment profiles. |
 | `versions.py` | The version commands: `versions` and `update`. |
 | `_common.py` | Shared surface helper: `is_secret_key`, the masking helper. |
 

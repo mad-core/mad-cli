@@ -25,6 +25,7 @@ from mad_cli.core.envfile import EnvFile
 from mad_cli.core.instance import Instance, InstanceNotFoundError, get_instance
 from mad_cli.core.keyspec import BUILTIN_KEYS, mask
 from mad_cli.core.paths import instance_dir
+from mad_cli.core.profiles import ProfileNotFoundError, load_profile
 from mad_cli.core.templates import EDGE_PACKAGE, RenderContext, write_instance_files
 from mad_cli.ui.console import console, error, header, info, ok, run_step, warn
 from mad_cli.ui.prompts import PromptRequiredError, ask, confirm
@@ -312,6 +313,11 @@ def install(
         help="Anthropic API key (optional — alternative billing to the Claude OAuth token).",
     ),
     set_key: list[str] | None = _SET_KEY_OPTION,
+    profile: str | None = typer.Option(
+        None,
+        "--profile",
+        help="Named profile whose values seed the wizard defaults (flags still win).",
+    ),
     retention_days: str | None = typer.Option(
         None,
         "--retention-days",
@@ -361,11 +367,31 @@ def install(
         if existing is not None:
             warn(f"Instance {name_value!r} already exists — values pre-filled from its .env.")
 
+        # Default layer feeding every prompt: an existing instance's .env
+        # pre-fills a reconfiguration, then a --profile overlays its reusable
+        # credentials/tuning on top (a profile never carries instance identity).
+        # Explicit flags still win — they short-circuit `prior` in `_collect`.
+        defaults = EnvFile.empty()
+        if existing is not None:
+            for key in existing.env.keys():  # noqa: SIM118 — EnvFile.keys() is its API
+                value = existing.env.get(key)
+                if value is not None:
+                    defaults.set(key, value)
+        if profile is not None:
+            try:
+                profile_env = load_profile(profile)
+            except ProfileNotFoundError as exc:
+                error(f"Profile {profile!r} not found. Run `mad profiles list` to see profiles.")
+                raise typer.Exit(1) from exc
+            for key in profile_env.keys():  # noqa: SIM118 — EnvFile.keys() is its API
+                value = profile_env.get(key)
+                if value is not None:
+                    defaults.set(key, value)
+
         def prior(key: str, fallback: str | None) -> str | None:
-            if existing is not None:
-                current = existing.env.get(key)
-                if current:
-                    return current
+            current = defaults.get(key)
+            if current:
+                return current
             return fallback
 
         port_value = _collect(

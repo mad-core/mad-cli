@@ -46,6 +46,8 @@ The `sessions/` directory is bind-mounted to `/sessions` in the container and pi
 
 `mad install` can optionally collect a few extra mad-edge settings up front so you do not need follow-up `mad config set` calls: an alternative `--anthropic-api-key`, additional registry/custom keys via repeatable `--set-key ID=VALUE`, session-log retention via `--retention-days`, and MCP allowed hosts via `--mcp-allowed-hosts`. Omitted knobs are left as commented references in the `.env`.
 
+Pass `--profile NAME` to seed the wizard's defaults from a saved profile (a reusable set of credentials/tuning managed with `mad profiles`); explicit flags still win over the profile, which wins over the built-in defaults.
+
 Use `--yes` to run it non-interactively.
 
 After install, manage the instance with:

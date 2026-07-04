@@ -8,6 +8,7 @@ from mad_cli.commands import install as install_cmd
 from mad_cli.commands import instances as instances_cmd
 from mad_cli.commands import keys as keys_cmd
 from mad_cli.commands import lifecycle as lifecycle_cmd
+from mad_cli.commands import profiles as profiles_cmd
 from mad_cli.commands import versions as versions_cmd
 
 app = typer.Typer(
@@ -59,6 +60,7 @@ app.command("update")(versions_cmd.update)
 # ── keys & config ─────────────────────────────────────────────────────────────
 app.add_typer(keys_cmd.keys_app, name="keys")
 app.add_typer(config_cmd.config_app, name="config")
+app.add_typer(profiles_cmd.profiles_app, name="profiles")
 
 
 def main() -> None:

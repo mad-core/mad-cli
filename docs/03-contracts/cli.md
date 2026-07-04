@@ -39,6 +39,7 @@ Each option is optional, and supplying its flag skips the matching interactive p
 | `--claude-token` | — | Claude OAuth token; run `claude setup-token`. |
 | `--anthropic-api-key` | — | Anthropic API key (secret, optional — alternative billing to the Claude OAuth token). Prompted right after the Claude token. Writes `ANTHROPIC_API_KEY`. |
 | `--set-key ID=VALUE` | — (repeatable) | Extra API key. `ID` is a builtin registry id (fanned out to its env vars) or a custom `[A-Z][A-Z0-9_]*` VAR name (written verbatim). `claude-oauth` is rejected here — it has its own `--claude-token`. In interactive mode a mini-loop offers the same after the main credentials. |
+| `--profile NAME` | — | Named profile whose values seed the wizard defaults. Precedence is explicit flag > profile > built-in default; a profile never carries instance identity (see `mad profiles`). An unknown profile exits 1. |
 | `--retention-days` | — (omit = keep forever) | Session-log retention in days (integer ≥ 1). When given, writes `MAD_SESSIONS_RETENTION_DAYS`; otherwise it is left as a commented reference. |
 | `--mcp-allowed-hosts` | — (blank = disabled) | Comma-separated MCP allowed hosts for DNS-rebinding protection. When given, writes `MAD_MCP_ALLOWED_HOSTS`; otherwise left as a commented reference. |
 | `--edge-package` | (hidden) | Override the mad-edge package name. |
@@ -187,3 +188,50 @@ Remove a key.
 | --- | --- | --- |
 | `KEY` | required | The key to remove. |
 | `--instance` / `-i` | sole instance | Which instance. |
+
+## profiles
+
+`mad profiles` is a sub-app that prints help with no subcommand. A *profile* is a reusable, named set of `.env` values (credentials + tuning, never instance identity) stored at `~/.config/mad/profiles/<name>.env` (`chmod 600`). The name follows the instance-name rule `[a-z0-9][a-z0-9-]*`.
+
+### `mad profiles create NAME`
+
+Create a profile, empty or seeded from an instance, plus optional `KEY=VALUE` pairs.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `NAME` | required | Profile name (`[a-z0-9][a-z0-9-]*`). Errors if it already exists. |
+| `--from-instance INST` | — | Seed from an instance's `.env`. The instance-identity keys (`MAD_INSTANCE`, `MAD_HOST_PORT`, `PUID`, `PGID`, `MAD_DATA_PATH`, `MAD_VERSION`) are always excluded; credentials and tuning are copied. |
+| `--set KEY=VALUE` | — (repeatable) | Set a variable in the profile. `KEY` must match `[A-Z_][A-Z0-9_]*`. |
+
+On a real terminal, after applying `--set`, an optional mini-loop offers to add more `KEY=VALUE` pairs interactively (the value is hidden only for secret-looking keys). The created profile is printed with secret-looking values masked.
+
+### `mad profiles list`
+
+List every stored profile with its variable count. Hints `mad profiles create` when there are none.
+
+### `mad profiles show NAME`
+
+Print a profile's variables (secret-looking values masked).
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `NAME` | required | Profile to display. A missing profile exits 1. |
+| `--reveal` | — | Show secret values in full (masked by default). |
+
+### `mad profiles delete NAME`
+
+Delete a profile.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `NAME` | required | Profile to delete. A missing profile exits 1. |
+| `--yes` / `-y` | — | Skip the confirmation prompt. Without it, a non-TTY run aborts (nothing deleted). |
+
+### `mad profiles apply NAME INSTANCE`
+
+Overlay a profile's variables onto an instance's `.env` (each profile key is set on the instance), then print a restart hint. A missing profile or instance exits 1.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `NAME` | required | Profile to apply. |
+| `INSTANCE` | required | Instance to overlay onto. |

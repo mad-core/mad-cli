@@ -21,6 +21,7 @@ src/mad_cli/
 │   ├── instances.py
 │   ├── keys.py
 │   ├── lifecycle.py
+│   ├── profiles.py
 │   └── versions.py
 ├── core/
 │   ├── __init__.py
@@ -31,6 +32,7 @@ src/mad_cli/
 │   ├── instance.py
 │   ├── keyspec.py
 │   ├── paths.py
+│   ├── profiles.py
 │   ├── pypi.py
 │   └── templates.py
 ├── templates/
