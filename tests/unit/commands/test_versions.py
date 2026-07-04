@@ -37,7 +37,7 @@ def _write_instance(root: Path, name: str, **env: str) -> Path:
 def test_versions_running_vs_stopped(
     cli: CliRunner, config_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from mad_cli.commands import versions as mod
+    from mad_cli.core.usecases import versions as mod
 
     _write_instance(config_dir, "web", MAD_HOST_PORT="9000", MAD_VERSION="0.5.0")
     _write_instance(config_dir, "api", MAD_HOST_PORT="9100")  # tracks latest, stopped
@@ -66,7 +66,7 @@ def test_versions_running_vs_stopped(
 def test_versions_update_available(
     cli: CliRunner, config_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from mad_cli.commands import versions as mod
+    from mad_cli.core.usecases import versions as mod
 
     _write_instance(config_dir, "web", MAD_HOST_PORT="9000")
 
@@ -83,7 +83,7 @@ def test_versions_update_available(
 def test_versions_latest_unknown_shows_question_mark(
     cli: CliRunner, config_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from mad_cli.commands import versions as mod
+    from mad_cli.core.usecases import versions as mod
 
     _write_instance(config_dir, "web", MAD_HOST_PORT="9000")
 
@@ -101,7 +101,7 @@ def test_versions_latest_unknown_shows_question_mark(
 def test_versions_uses_env_edge_package_override(
     cli: CliRunner, config_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from mad_cli.commands import versions as mod
+    from mad_cli.core.usecases import versions as mod
 
     _write_instance(config_dir, "web", MAD_HOST_PORT="9000", MAD_EDGE_PACKAGE="mad-bros")
 
@@ -124,7 +124,7 @@ def test_versions_uses_env_edge_package_override(
 def test_versions_unknown_instance_errors(
     cli: CliRunner, config_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from mad_cli.commands import versions as mod
+    from mad_cli.core.usecases import versions as mod
 
     monkeypatch.setattr(mod, "ComposeRunner", MagicMock())
     result = cli.invoke(app, ["versions", "ghost"])
@@ -144,7 +144,7 @@ def test_versions_empty_hints_install(cli: CliRunner, config_dir: Path) -> None:
 def test_update_pins_version_and_rebuilds_in_order(
     cli: CliRunner, config_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from mad_cli.commands import versions as mod
+    from mad_cli.core.usecases import versions as mod
 
     inst_dir = _write_instance(config_dir, "web", MAD_HOST_PORT="9000", MAD_VERSION="")
 
@@ -168,7 +168,7 @@ def test_update_pins_version_and_rebuilds_in_order(
 def test_update_without_version_tracks_latest(
     cli: CliRunner, config_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from mad_cli.commands import versions as mod
+    from mad_cli.core.usecases import versions as mod
 
     inst_dir = _write_instance(config_dir, "web", MAD_HOST_PORT="9000", MAD_VERSION="0.5.0")
 
@@ -186,7 +186,7 @@ def test_update_without_version_tracks_latest(
 def test_update_unhealthy_exits_nonzero(
     cli: CliRunner, config_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from mad_cli.commands import versions as mod
+    from mad_cli.core.usecases import versions as mod
 
     _write_instance(config_dir, "web", MAD_HOST_PORT="9000")
 
@@ -202,7 +202,7 @@ def test_update_unhealthy_exits_nonzero(
 def test_update_unknown_instance_errors(
     cli: CliRunner, config_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from mad_cli.commands import versions as mod
+    from mad_cli.core.usecases import versions as mod
 
     monkeypatch.setattr(mod, "ComposeRunner", MagicMock())
     result = cli.invoke(app, ["update", "ghost"])

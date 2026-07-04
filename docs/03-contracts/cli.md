@@ -235,3 +235,41 @@ Overlay a profile's variables onto an instance's `.env` (each profile key is set
 | --- | --- | --- |
 | `NAME` | required | Profile to apply. |
 | `INSTANCE` | required | Instance to overlay onto. |
+
+The `--profile` flag on `mad install` seeds the wizard defaults from a profile (explicit flag > profile > built-in default).
+
+## Service mode (HTTP API)
+
+The local HTTP API lives in the optional `server` extra (`pip install 'mad-cli[server]'`). The base CLI stays a two-dependency package; the commands below are always present, but `mad serve` needs the extra (or a provisioned server venv). See [`http-api.md`](http-api.md) for the API surface and auth.
+
+### `mad serve`
+
+Run the HTTP API in the foreground (uvicorn). Generates the bearer token at `config_root()/api-token` (mode 0600) on first run.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `--host` | `127.0.0.1` | Bind address. A non-loopback value prints a loud warning. |
+| `--port` | `7373` | Bind port. |
+
+If the `server` extra is not importable in the current environment it hands off to `config_root()/server-venv/bin/mad serve` when that venv exists; otherwise it errors with a hint offering both `pip install 'mad-cli[server]'` and `mad service install`.
+
+### `mad service install`
+
+Render the boot-persistent service file — a systemd **user** unit on Linux (`~/.config/systemd/user/mad-cli.service`), a launchd LaunchAgent on macOS (`~/Library/LaunchAgents/com.mad-core.mad-cli.plist`). When the `server` extra is not importable (or `--wheel` is passed) it first provisions a dedicated venv under `config_root()/server-venv` and points `ExecStart` at it; otherwise `ExecStart` uses the current `mad`.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `--host` | `127.0.0.1` | Bind address baked into the unit. |
+| `--port` | `7373` | Bind port baked into the unit. |
+| `--wheel` / `--from` | — | Provision the server venv from a local wheel/sdist (no PyPI). Forces venv provisioning even when the extra is present. |
+| `--render-to PATH` | — | Write the unit/plist to `PATH` and stop — never touches `systemctl`/`launchctl` (used by tests and the E2E). |
+
+Without `--render-to` it writes to the default path and activates (`systemctl --user daemon-reload && enable --now`, printing a `loginctl enable-linger` hint; or `launchctl load`).
+
+### `mad service uninstall` / `status` / `update`
+
+| Command | Purpose |
+| --- | --- |
+| `mad service uninstall` | Stop and remove the installed unit/plist. The server venv is left in place. |
+| `mad service status` | Report the service file, whether the server venv exists and whether its `mad-cli` version matches this CLI (warns on drift). |
+| `mad service update [--wheel PATH]` | Reinstall `mad-cli[server]` into the server venv at this CLI's version. |

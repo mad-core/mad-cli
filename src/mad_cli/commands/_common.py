@@ -1,13 +1,12 @@
-"""Small presentation helpers shared across commands."""
+"""Small presentation helpers shared across commands.
+
+Secret detection now lives in the framework-free engine
+(:func:`mad_cli.core.keyspec.is_secret_key`) so the HTTP surface and the CLI
+share one masking rule; it is re-exported here for the command modules.
+"""
 
 from __future__ import annotations
 
-# Substrings that mark an env key as holding a secret whose value must be masked
-# before it is shown to a human.
-_SECRET_HINTS = ("TOKEN", "KEY", "SECRET", "PASSWORD")
+from mad_cli.core.keyspec import is_secret_key
 
-
-def is_secret_key(key: str) -> bool:
-    """True if ``key`` looks like it holds a credential."""
-    upper = key.upper()
-    return any(hint in upper for hint in _SECRET_HINTS)
+__all__ = ["is_secret_key"]

@@ -15,6 +15,7 @@ Tree of `src/mad_cli/` reconstructed from git-tracked files only (untracked arti
 src/mad_cli/
 ├── commands/
 │   ├── __init__.py
+│   ├── _adapt.py
 │   ├── _common.py
 │   ├── config.py
 │   ├── install.py
@@ -22,8 +23,20 @@ src/mad_cli/
 │   ├── keys.py
 │   ├── lifecycle.py
 │   ├── profiles.py
+│   ├── service.py
 │   └── versions.py
 ├── core/
+│   ├── usecases/
+│   │   ├── __init__.py
+│   │   ├── adopt.py
+│   │   ├── configvals.py
+│   │   ├── errors.py
+│   │   ├── install.py
+│   │   ├── instances.py
+│   │   ├── keys.py
+│   │   ├── lifecycle.py
+│   │   ├── service.py
+│   │   └── versions.py
 │   ├── __init__.py
 │   ├── claude_creds.py
 │   ├── compose.py
@@ -35,11 +48,18 @@ src/mad_cli/
 │   ├── profiles.py
 │   ├── pypi.py
 │   └── templates.py
+├── server/
+│   ├── __init__.py
+│   ├── app.py
+│   ├── auth.py
+│   └── models.py
 ├── templates/
 │   ├── __init__.py
+│   ├── com.mad-core.mad-cli.plist.tmpl
 │   ├── compose.yml.tmpl
 │   ├── Dockerfile.tmpl
-│   └── entrypoint.sh.tmpl
+│   ├── entrypoint.sh.tmpl
+│   └── mad-cli.service.tmpl
 ├── ui/
 │   ├── __init__.py
 │   ├── console.py

@@ -53,9 +53,42 @@ planned.
 | `mad keys` | v0.2 | Set, rotate and mask API keys / tokens in `.env`. |
 | `mad config` | v0.2 | Read and edit `.env` values safely. |
 | `mad versions` / `update` | v0.3 | Show the latest published mad-edge and rebuild onto it. |
+| `mad serve` / `service` | v0.4 | Run the local HTTP API, or install it as a background service. |
 
 Instance-scoped commands take an optional `INSTANCE` argument; when exactly one instance is
 configured it is used by default.
+
+## HTTP API (optional)
+
+Every CLI capability is also exposed over a local HTTP API so a UI/dashboard can build on the
+same logic. It ships as an **optional extra** so the base CLI stays a two-dependency package
+(typer + rich):
+
+```bash
+pip install 'mad-cli[server]'
+
+mad serve                 # foreground API on http://127.0.0.1:7373
+```
+
+The API binds `127.0.0.1` by default and requires a bearer token (auto-generated at
+`~/.config/mad/api-token`, mode 0600) on every request except `/health`. Secret values are
+always masked on reads. OpenAPI is served at `/openapi.json`, docs at `/docs`. See
+[`docs/03-contracts/http-api.md`](docs/03-contracts/http-api.md).
+
+To keep it running across reboots:
+
+```bash
+mad service install       # systemd user unit (Linux) / launchd LaunchAgent (macOS)
+```
+
+If the `server` extra is not installed, `mad service install` **auto-provisions a dedicated
+virtualenv** under `~/.config/mad/server-venv` and installs the API there (use `--wheel PATH`
+to install from a local artifact instead of PyPI), then points the service at it — the base
+CLI never needs FastAPI in its own environment.
+
+> **MVP limitation.** Long operations (install with start, `start`, `update`) run
+> synchronously — the request blocks until the Docker build and health wait finish. Background
+> jobs are a future enhancement.
 
 ## How it relates to mad-edge
 

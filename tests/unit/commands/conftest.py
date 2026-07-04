@@ -104,10 +104,18 @@ def make_instance() -> Callable[..., FakeInstance]:
 
 @pytest.fixture
 def install_mocks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> SimpleNamespace:
-    """Patch every core dependency of ``mad_cli.commands.install`` for the happy path."""
+    """Patch the install command adapter and its use-case dependencies.
+
+    The orchestration moved into ``core.usecases.install`` (file writing) and
+    ``core.usecases.lifecycle`` (the start), so those internals are patched there;
+    the Docker preflight, reconfigure prefill and masked summary stay in the
+    command module and are patched there.
+    """
     from mad_cli.commands import install as mod
     from mad_cli.core.docker_check import DockerStatus
     from mad_cli.core.instance import InstanceNotFoundError
+    from mad_cli.core.usecases import install as uc_install
+    from mad_cli.core.usecases import lifecycle as uc_lifecycle
 
     ns = SimpleNamespace(mod=mod, tmp_path=tmp_path)
 
@@ -123,18 +131,21 @@ def install_mocks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> SimpleName
     ns.get_instance = MagicMock(side_effect=_no_instance)
     monkeypatch.setattr(mod, "get_instance", ns.get_instance)
 
+    # EnvFile is used both for the command's scratch extra-keys overlay and by the
+    # use case to build the canonical .env.
     monkeypatch.setattr(mod, "EnvFile", FakeEnvFile)
+    monkeypatch.setattr(uc_install, "EnvFile", FakeEnvFile)
 
     ns.instance_dir = MagicMock(side_effect=lambda name: tmp_path / "cfg" / name)
-    monkeypatch.setattr(mod, "instance_dir", ns.instance_dir)
+    monkeypatch.setattr(uc_install, "instance_dir", ns.instance_dir)
 
     ns.write_instance_files = MagicMock()
-    monkeypatch.setattr(mod, "write_instance_files", ns.write_instance_files)
+    monkeypatch.setattr(uc_install, "write_instance_files", ns.write_instance_files)
 
     ns.write_claude_credentials = MagicMock(
         side_effect=lambda claude_dir, token: Path(claude_dir) / ".credentials.json"
     )
-    monkeypatch.setattr(mod, "write_claude_credentials", ns.write_claude_credentials)
+    monkeypatch.setattr(uc_install, "write_claude_credentials", ns.write_claude_credentials)
 
     ns.mask = MagicMock(side_effect=lambda value: "MASKED")
     monkeypatch.setattr(mod, "mask", ns.mask)
@@ -142,7 +153,7 @@ def install_mocks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> SimpleName
     ns.runner = MagicMock()
     ns.runner.wait_healthy.return_value = True
     ns.ComposeRunner = MagicMock(return_value=ns.runner)
-    monkeypatch.setattr(mod, "ComposeRunner", ns.ComposeRunner)
+    monkeypatch.setattr(uc_lifecycle, "ComposeRunner", ns.ComposeRunner)
 
     return ns
 
@@ -190,13 +201,22 @@ def make_real_instance(cli_config_dir: Path, tmp_path: Path) -> Callable[..., Pa
 
 @pytest.fixture
 def lifecycle_mocks(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
-    """Patch ``ComposeRunner`` in the lifecycle module and hand back the shared runner."""
-    from mad_cli.commands import lifecycle as mod
+    """Patch the lifecycle runner and expose the resolution module.
 
-    ns = SimpleNamespace(mod=mod)
+    ``ComposeRunner`` is patched in both the use case (start/stop/restart/status)
+    and the command adapter (the interactive logs/shell). ``ns.mod`` is the
+    resolution module (``core.usecases.instances``) where ``default_instance`` /
+    ``get_instance`` / ``discover_instances`` live, so tests patch them there.
+    """
+    from mad_cli.commands import lifecycle as cmd_mod
+    from mad_cli.core.usecases import instances as resolve_mod
+    from mad_cli.core.usecases import lifecycle as uc_lifecycle
+
+    ns = SimpleNamespace(mod=resolve_mod)
     ns.runner = MagicMock()
     ns.runner.wait_healthy.return_value = True
     ns.runner.ps.return_value = "mad-web  Up 3 minutes (healthy)"
     ns.ComposeRunner = MagicMock(return_value=ns.runner)
-    monkeypatch.setattr(mod, "ComposeRunner", ns.ComposeRunner)
+    monkeypatch.setattr(uc_lifecycle, "ComposeRunner", ns.ComposeRunner)
+    monkeypatch.setattr(cmd_mod, "ComposeRunner", ns.ComposeRunner)
     return ns

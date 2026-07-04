@@ -13,6 +13,11 @@ This page lists key NAMES and their purposes only. Values are never shown here, 
 
 - `MAD_CLI_CONFIG_DIR` — overrides the default config root `~/.config/mad` (read by `core.paths`).
 
+Two host-side files live under the config root for the HTTP API (service mode):
+
+- `api-token` — the bearer token for the HTTP API, auto-generated on the first `mad serve` / `mad service install`, mode `0600`. **Secret** — never printed.
+- `server-venv/` — the dedicated virtualenv `mad service install` provisions when the `server` extra is not importable in the operator's environment (`mad-cli[server]` installed there; the rendered unit/plist points `ExecStart` at `server-venv/bin/mad`).
+
 ## Layer B — per-instance `.env` keys
 
 These are the keys mad-cli writes and manages in `~/.config/mad/instances/<name>/.env`. Most are assembled by `mad install`.

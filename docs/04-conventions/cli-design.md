@@ -15,10 +15,19 @@ the app carries a help string. The version is exposed through an eager
 `--version` callback: it prints `mad_cli.__version__` and then raises
 `typer.Exit()`.
 
+## Thin adapters over the use-case layer
+
+Every command is a thin adapter over `mad_cli.core.usecases` — it parses flags,
+prompts, and presents, then calls a use-case function that also backs the HTTP
+API, so the two surfaces cannot drift. Use-case failures are raised as
+`UseCaseError` subclasses and mapped to the CLI idiom (an `error(...)` line plus
+`typer.Exit(1)`) by `commands/_adapt.py` (`resolve_or_die`, `die`, `fail`).
+
 ## Instance resolution
 
-A single resolution pattern is shared across the lifecycle, keys, config and
-versions commands:
+A single resolution pattern (`commands/_adapt.resolve_or_die`, over
+`usecases.instances.resolve_instance`) is shared across the lifecycle, keys,
+config and versions commands:
 
 - If a name or `--instance` is given, resolve it via `get_instance`. On a miss,
   emit an error and raise `typer.Exit(1)`, hinting `mad list`.
@@ -45,19 +54,24 @@ a TTY (or under `--yes`):
 Every display of a credential is masked:
 
 - `core.keyspec.mask` shows a short prefix/suffix (for example `abcd…yz`) or `…`
-  for short values.
-- `commands/_common.is_secret_key(key)` treats a key as secret when its name
-  contains `TOKEN`, `KEY`, `SECRET` or `PASSWORD`.
+  for short values; `core.keyspec.display_value(key, value, *, reveal)` combines
+  it with the secret check.
+- `core.keyspec.is_secret_key(key)` (re-exported from `commands/_common`) treats
+  a key as secret when its name contains `TOKEN`, `KEY`, `SECRET` or `PASSWORD`.
 - `config get` and `profiles show` mask unless `--reveal` is passed.
-- `keys list`, `keys info` and the install summary always mask.
+- `keys list`, `info` and the install summary always mask. The HTTP API always
+  masks and has no reveal flag.
 
 ## Output helpers
 
 There is a single shared rich `Console` (`ui/console.py`) with status glyph
 helpers `info`, `ok`, `warn`, `error` and `header`, plus a `run_step` that shows
 a spinner on a real terminal but falls back to a plain line under redirected or
-test output (deterministic and non-blocking). `error` only renders; callers
-decide whether to exit.
+test output (deterministic and non-blocking). The helpers escape their message
+argument (only the glyph carries markup), so literal brackets in a message —
+`pip install 'mad-cli[server]'`, an `[A-Z][A-Z0-9_]*` pattern — are printed
+verbatim instead of being swallowed as rich style tags. `error` only renders;
+callers decide whether to exit.
 
 ## Restart hint
 

@@ -1,0 +1,15 @@
+[Unit]
+Description=Mad operator CLI HTTP API (mad serve)
+Documentation=https://github.com/mad-core/mad-cli
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=${exec_start}
+Environment=MAD_CLI_CONFIG_DIR=${config_dir}
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

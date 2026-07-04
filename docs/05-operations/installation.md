@@ -24,6 +24,16 @@ The package provides the `mad` console script, which can also be run as `python 
 
 Docker is NOT needed to install the CLI, but it IS needed at runtime to actually run an instance.
 
+### Optional HTTP API (the `server` extra)
+
+The local HTTP API (`mad serve` / the FastAPI app) ships as an optional extra so the base install stays two dependencies:
+
+```
+pip install 'mad-cli[server]'
+```
+
+You do not have to install it yourself: `mad service install` auto-provisions a dedicated venv under `~/.config/mad/server-venv` when the extra is missing (see [03-contracts/http-api.md](../03-contracts/http-api.md) and [03-contracts/cli.md](../03-contracts/cli.md#service-mode-http-api)).
+
 ## From source (contributors)
 
 ```

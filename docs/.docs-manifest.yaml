@@ -56,7 +56,7 @@ docs:
   produces:
     type: manual
   adapted_heuristic: null
-  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+  acknowledged_at_commit: 09f30e16b25a5534f2b87c64e7fa0774cbd9ca69
 - path: docs/01-overview/context.md
   section: overview
   kind: manual
@@ -161,7 +161,7 @@ docs:
     when the core<->surface layering rule (CLAUDE.md hard rule 3 / CONTRACTS.md)
     changes. Renames within an existing module are captured by source-tree.md and
     do NOT need a rewrite.
-  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
+  acknowledged_at_commit: 09f30e16b25a5534f2b87c64e7fa0774cbd9ca69
 - path: docs/02-architecture/source-tree.md
   section: architecture
   kind: deterministic
@@ -183,7 +183,7 @@ docs:
     params:
       root: src/mad_cli
   adapted_heuristic: null
-  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+  acknowledged_at_commit: 09f30e16b25a5534f2b87c64e7fa0774cbd9ca69
 - path: docs/02-architecture/test-tree.md
   section: architecture
   kind: deterministic
@@ -205,7 +205,7 @@ docs:
     params:
       root: tests
   adapted_heuristic: null
-  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+  acknowledged_at_commit: 09f30e16b25a5534f2b87c64e7fa0774cbd9ca69
 
 # ---- 03 contracts -------------------------------------------------------
 # A CLI's "interface contract" is its command surface, not an HTTP/OpenAPI dump.
@@ -239,7 +239,37 @@ docs:
     lifecycle start|stop|restart|status|logs|shell, inventory list|info|adopt,
     versions|update, keys set|list|remove, config get|set|unset) in sync with the
     registration order in `app.py`.
-  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
+  acknowledged_at_commit: 09f30e16b25a5534f2b87c64e7fa0774cbd9ca69
+- path: docs/03-contracts/http-api.md
+  section: contracts
+  kind: heuristic
+  description: |
+    The optional local HTTP API (the `server` extra): how to run it (`mad serve`
+    / `mad service`), bearer-token auth against `config_root()/api-token`, the
+    always-masked secrets rule, the v1 route table (a thin adapter over the same
+    use cases as the CLI), the use-case-error → HTTP-status mapping, and the
+    synchronous-operations MVP limitation.
+  triggers:
+    discovery_hint: |
+      The FastAPI app factory, its routes/models/auth, the serve/service command,
+      and the service use case (token, venv bootstrap, unit/plist rendering).
+    paths:
+    - src/mad_cli/server/**
+    - src/mad_cli/commands/service.py
+    - src/mad_cli/core/usecases/service.py
+    hint: |
+      A route, request/response model, the auth rule, or the serve/service flow
+      changed — re-derive the reference from the FastAPI app and the service
+      use case.
+  produces:
+    type: manual
+  adapted_heuristic: |
+    Re-author when `server/app.py` adds/removes/renames a route or changes a
+    status code, when `server/models.py` changes a request/response field, when
+    `server/auth.py` changes the token rule, or when `commands/service.py` /
+    `core/usecases/service.py` change the serve/service or venv-bootstrap flow.
+    Never document a way to return an unmasked secret — the API has none.
+  acknowledged_at_commit: 09f30e16b25a5534f2b87c64e7fa0774cbd9ca69
 - path: docs/03-contracts/external-dependencies.md
   section: contracts
   kind: heuristic
@@ -270,7 +300,7 @@ docs:
     PyPI JSON endpoint or fail-soft behaviour in `pypi.py` changes, or when a
     `*.tmpl` under `templates/` changes what is installed inside the container
     (base image, agent CLIs, the mad-edge package/entrypoint).
-  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
+  acknowledged_at_commit: 09f30e16b25a5534f2b87c64e7fa0774cbd9ca69
 
 # ---- 04 conventions -----------------------------------------------------
 - path: docs/04-conventions/cli-design.md
@@ -302,7 +332,7 @@ docs:
     contract in `ui/prompts.py` (`PromptRequiredError`, non-TTY behaviour)
     changes, or when the masking rule (`commands/_common.is_secret_key`,
     `core/keyspec.mask`) changes.
-  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
+  acknowledged_at_commit: 09f30e16b25a5534f2b87c64e7fa0774cbd9ca69
 - path: docs/04-conventions/layering.md
   section: conventions
   kind: heuristic
@@ -334,7 +364,7 @@ docs:
     `commands/`/`ui/` module starts touching `subprocess`/the filesystem
     directly, or when the mypy-strict scope (`[[tool.mypy.overrides]]` on
     `mad_cli.core.*`) changes.
-  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
+  acknowledged_at_commit: 09f30e16b25a5534f2b87c64e7fa0774cbd9ca69
 - path: docs/04-conventions/quality.md
   section: conventions
   kind: heuristic
@@ -360,7 +390,7 @@ docs:
     (timeout, markers, addopts) or the dev dependency set in pyproject.toml
     change, or when the `quality`/`test`/`audit` jobs in `ci.yml` change what
     they enforce.
-  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
+  acknowledged_at_commit: 09f30e16b25a5534f2b87c64e7fa0774cbd9ca69
 - path: docs/04-conventions/testing-strategy.md
   section: conventions
   kind: heuristic
@@ -388,7 +418,7 @@ docs:
     `--cov-fail-under` threshold in `ci.yml` changes, or when the mocking
     convention (mock `mad_cli.core`, real-core fixtures like
     `make_real_instance`) changes.
-  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
+  acknowledged_at_commit: 09f30e16b25a5534f2b87c64e7fa0774cbd9ca69
 
 # ---- 05 operations ------------------------------------------------------
 - path: docs/05-operations/installation.md
@@ -417,7 +447,7 @@ docs:
     (`requires-python`, the `mad` console script, dependencies), when the README
     quickstart changes, or when `commands/install.py` changes the guided-install
     flow (Docker preflight, the collected parameters, `--no-start`).
-  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
+  acknowledged_at_commit: a1fc77ec9941692c70483a92b4bb8c7a5bda687d
 - path: docs/05-operations/configuration.md
   section: operations
   kind: heuristic
@@ -447,7 +477,7 @@ docs:
     or compose-baked-key set in `config.py` change, or when a `KeySpec` is
     added/removed in `keyspec.BUILTIN_KEYS`. This doc is the authoritative key
     inventory; keep secrets masked and never print a value.
-  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
+  acknowledged_at_commit: 09f30e16b25a5534f2b87c64e7fa0774cbd9ca69
 - path: docs/05-operations/ci-cd.md
   section: operations
   kind: heuristic
@@ -510,7 +540,7 @@ docs:
     when the path-gate or `release_kind`/`manual_publish` inputs in `release.yml`
     change, or when `testpypi-preview.yml` changes its build/publish/verify jobs
     or the `TESTPYPI_ENABLED` gate. Cross-reference CLAUDE.md hard rules 2 and 6.
-  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
+  acknowledged_at_commit: 09f30e16b25a5534f2b87c64e7fa0774cbd9ca69
 
 # ---- 06 history ---------------------------------------------------------
 # `changelog` is heuristic, sourced from the semantic-release CHANGELOG.md at the

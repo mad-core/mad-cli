@@ -24,8 +24,13 @@ tests/
 │   │   ├── test_keys.py
 │   │   ├── test_lifecycle.py
 │   │   ├── test_profiles.py
+│   │   ├── test_service_cli.py
 │   │   └── test_versions.py
 │   ├── core/
+│   │   ├── usecases/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_install_flow.py
+│   │   │   └── test_service.py
 │   │   ├── __init__.py
 │   │   ├── test_claude_creds.py
 │   │   ├── test_compose.py
@@ -37,6 +42,9 @@ tests/
 │   │   ├── test_profiles.py
 │   │   ├── test_pypi.py
 │   │   └── test_templates.py
+│   ├── server/
+│   │   ├── __init__.py
+│   │   └── test_api.py
 │   ├── ui/
 │   │   ├── __init__.py
 │   │   └── test_prompts.py
