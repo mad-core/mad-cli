@@ -3,8 +3,10 @@
 import typer
 
 from mad_cli import __version__
+from mad_cli.commands import config as config_cmd
 from mad_cli.commands import install as install_cmd
 from mad_cli.commands import instances as instances_cmd
+from mad_cli.commands import keys as keys_cmd
 from mad_cli.commands import lifecycle as lifecycle_cmd
 
 app = typer.Typer(
@@ -47,6 +49,10 @@ app.command("shell")(lifecycle_cmd.shell)
 # ── inventory ────────────────────────────────────────────────────────────────
 app.command("list")(instances_cmd.list_)
 app.command("info")(instances_cmd.info_cmd)
+
+# ── keys & config ─────────────────────────────────────────────────────────────
+app.add_typer(keys_cmd.keys_app, name="keys")
+app.add_typer(config_cmd.config_app, name="config")
 
 
 def main() -> None:

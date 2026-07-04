@@ -135,6 +135,47 @@ def install_mocks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> SimpleName
 
 
 @pytest.fixture
+def cli_config_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    """Point ``MAD_CLI_CONFIG_DIR`` at a scratch dir so the real core reads/writes there."""
+    root = tmp_path / "config"
+    monkeypatch.setenv("MAD_CLI_CONFIG_DIR", str(root))
+    return root
+
+
+@pytest.fixture
+def make_real_instance(cli_config_dir: Path, tmp_path: Path) -> Callable[..., Path]:
+    """Create a real on-disk instance the unmocked core can discover.
+
+    Writes ``instances/<name>/.env`` under the scratch ``MAD_CLI_CONFIG_DIR`` and
+    returns that instance's config directory. ``env`` overrides/extends the base
+    keys; ``data_path`` defaults to ``tmp_path/data`` so credential files land in
+    a writable place.
+    """
+    from mad_cli.core.paths import instances_root
+
+    def _make(
+        name: str = "default",
+        env: dict[str, str] | None = None,
+        data_path: Path | None = None,
+    ) -> Path:
+        data = data_path if data_path is not None else tmp_path / "data"
+        values: dict[str, str] = {
+            "MAD_INSTANCE": name,
+            "MAD_HOST_PORT": "8080",
+            "MAD_DATA_PATH": str(data),
+        }
+        if env:
+            values.update(env)
+        inst_dir = instances_root() / name
+        inst_dir.mkdir(parents=True, exist_ok=True)
+        body = "".join(f"{key}={value}\n" for key, value in values.items())
+        (inst_dir / ".env").write_text(body, encoding="utf-8")
+        return inst_dir
+
+    return _make
+
+
+@pytest.fixture
 def lifecycle_mocks(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     """Patch ``ComposeRunner`` in the lifecycle module and hand back the shared runner."""
     from mad_cli.commands import lifecycle as mod
