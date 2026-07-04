@@ -59,13 +59,27 @@ def test_dockerfile_preserves_shell_escapes() -> None:
     assert "/opt/venv/bin:${PATH}" in out["Dockerfile"]
 
 
-def test_compose_has_port_and_three_bind_mounts() -> None:
+def test_compose_has_port_and_four_bind_mounts() -> None:
     out = render_all(_ctx(instance="prod", host_port=9000, data_path=Path("/srv/mad")))
     compose = out["compose.yml"]
     assert '"9000:8000"' in compose
     assert "/srv/mad/prod/workspaces:/workspaces" in compose
+    assert "/srv/mad/prod/sessions:/sessions" in compose
     assert "/srv/mad/prod/claude:/home/mad/.claude" in compose
     assert "/srv/mad/prod/aws:/home/mad/.aws:ro" in compose
+
+
+def test_compose_forces_sessions_dir_env() -> None:
+    # MAD_SESSIONS_DIR is pinned container-side (like MAD_WORKSPACE_DIR) so the
+    # bind mount and the env var can never diverge.
+    out = render_all(_ctx())
+    assert "MAD_SESSIONS_DIR: /sessions" in out["compose.yml"]
+
+
+def test_dockerfile_creates_and_owns_sessions_dir() -> None:
+    dockerfile = render_all(_ctx())["Dockerfile"]
+    assert "mkdir -p /workspaces /sessions /home/mad/.claude /home/mad/.aws" in dockerfile
+    assert 'chown -R "${PUID}:${PGID}" /workspaces /sessions /home/mad' in dockerfile
 
 
 def test_write_instance_files(tmp_path: Path) -> None:
