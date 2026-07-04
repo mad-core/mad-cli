@@ -447,7 +447,7 @@ docs:
     (`requires-python`, the `mad` console script, dependencies), when the README
     quickstart changes, or when `commands/install.py` changes the guided-install
     flow (Docker preflight, the collected parameters, `--no-start`).
-  acknowledged_at_commit: 09f30e16b25a5534f2b87c64e7fa0774cbd9ca69
+  acknowledged_at_commit: a1fc77ec9941692c70483a92b4bb8c7a5bda687d
 - path: docs/05-operations/configuration.md
   section: operations
   kind: heuristic
