@@ -140,7 +140,9 @@ def _ensure_docker(*, assume_yes: bool) -> None:
         error("The Docker daemon is not running. Start Docker and re-run `mad install`.")
         raise typer.Exit(1)
     if not status.compose_v2:
-        error("Docker Compose v2 was not found. Install it: https://docs.docker.com/compose/install/")
+        error(
+            "Docker Compose v2 was not found. Install it: https://docs.docker.com/compose/install/"
+        )
         raise typer.Exit(1)
     ok(f"Docker ready — {status.version}" if status.version else "Docker ready")
 
@@ -315,8 +317,7 @@ def install(
 
     if not git_name_value or not git_email_value:
         warn(
-            "No git identity set — the agent's commits may be rejected. "
-            "Use --git-name/--git-email."
+            "No git identity set — the agent's commits may be rejected. Use --git-name/--git-email."
         )
     if not claude_value:
         warn("No Claude token set — the container starts but agents cannot authenticate.")

@@ -40,9 +40,7 @@ def test_confirm_returns_default_when_non_interactive(non_tty: None) -> None:
     assert confirm("Proceed?", default=True) is True
 
 
-def test_ask_reprompts_until_validator_accepts(
-    tty: None, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_ask_reprompts_until_validator_accepts(tty: None, monkeypatch: pytest.MonkeyPatch) -> None:
     answers = iter(["bad", "also-bad", "42"])
     monkeypatch.setattr(prompts.Prompt, "ask", staticmethod(lambda *a, **k: next(answers)))
 

@@ -81,9 +81,7 @@ def test_install_happy_path_writes_files_and_starts(
     assert "http://localhost:9000" in result.output
 
 
-def test_install_no_start_skips_container(
-    cli: CliRunner, install_mocks: SimpleNamespace
-) -> None:
+def test_install_no_start_skips_container(cli: CliRunner, install_mocks: SimpleNamespace) -> None:
     args = _happy_args(install_mocks.tmp_path) + ["--no-start"]
     result = cli.invoke(app, args)
     assert result.exit_code == 0, result.output

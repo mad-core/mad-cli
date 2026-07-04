@@ -71,9 +71,7 @@ def test_info_masks_secret_env_values(
     assert "Ada Lovelace" in result.output
 
 
-def test_info_unknown_instance_errors(
-    cli: CliRunner, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_info_unknown_instance_errors(cli: CliRunner, monkeypatch: pytest.MonkeyPatch) -> None:
     from mad_cli.commands import instances as mod
 
     def _raise(name: str):
