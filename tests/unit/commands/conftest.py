@@ -72,6 +72,15 @@ class FakeInstance:
     env: FakeEnvFile = field(default_factory=FakeEnvFile)
     legacy: bool = False
 
+    @property
+    def env_file(self) -> Path:
+        return self.config_dir / ".env"
+
+    @property
+    def version_pin(self) -> str | None:
+        """Pinned ``MAD_VERSION`` ('' or unset -> ``None``), matching the real Instance."""
+        return self.env.get("MAD_VERSION") or None
+
 
 @pytest.fixture
 def make_env() -> Callable[..., FakeEnvFile]:

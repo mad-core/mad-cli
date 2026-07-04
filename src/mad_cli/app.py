@@ -8,6 +8,7 @@ from mad_cli.commands import install as install_cmd
 from mad_cli.commands import instances as instances_cmd
 from mad_cli.commands import keys as keys_cmd
 from mad_cli.commands import lifecycle as lifecycle_cmd
+from mad_cli.commands import versions as versions_cmd
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -49,6 +50,11 @@ app.command("shell")(lifecycle_cmd.shell)
 # ── inventory ────────────────────────────────────────────────────────────────
 app.command("list")(instances_cmd.list_)
 app.command("info")(instances_cmd.info_cmd)
+app.command("adopt")(instances_cmd.adopt)
+
+# ── versions ─────────────────────────────────────────────────────────────────
+app.command("versions")(versions_cmd.versions)
+app.command("update")(versions_cmd.update)
 
 # ── keys & config ─────────────────────────────────────────────────────────────
 app.add_typer(keys_cmd.keys_app, name="keys")
