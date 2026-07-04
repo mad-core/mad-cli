@@ -1,0 +1,541 @@
+# docs/.docs-manifest.yaml — local source of truth for this repo's /docs.
+# Structure mirrors the org backend docs contract, adapted to what mad-cli IS:
+# an operator CLI (no HTTP/SSE/MCP surface, no database). The generic
+# "interfaces" section becomes the CLI command surface (03-contracts/cli.md)
+# plus its external dependencies; there is no api-reference / data-model /
+# events entry because a CLI has none. triggers.paths / produces.params are
+# adapted to this repo's actual tree.
+#
+# mad-cli-specific deviations from the generic backend contract:
+#   - No 03-api/api-reference.md, no data-model, no events: mad-cli exposes a
+#     Typer command surface, not an HTTP app object — nothing to dump as
+#     OpenAPI and no persistence layer to model.
+#   - 05-operations/ci-cd.md -> heuristic (not the `config`/deterministic path):
+#     the shared docs-validate CI installs only `gen_docs`, so the job/step
+#     skeleton is authored, not regenerated in CI.
+#   - 06-history/changelog.md -> heuristic, sourced from the semantic-release
+#     CHANGELOG.md at the repo root (consumer-facing, grouped by release), NOT a
+#     raw git log.
+
+schema_version: 1
+service: mad-cli
+domain: backend
+generator_skill: generate-docs
+bootstrap_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+docs:
+- path: docs/README.md
+  section: meta
+  kind: manual
+  description: |
+    The local docs manual. Explains the /docs structure and what each section
+    contains. Hand-authored once; rarely changes.
+  triggers:
+    discovery_hint: |
+      No code path determines this. Structural/meta content. Leave `paths: []`.
+    paths: []
+    max_age_days: 365
+  produces:
+    type: manual
+  adapted_heuristic: null
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+
+# ---- 01 overview --------------------------------------------------------
+- path: docs/01-overview/passport.md
+  section: overview
+  kind: manual
+  description: |
+    One-page service card. Declares `service`/`domain`, the interface profile
+    (cli only — no http/sse/mcp) and the section registry (which optional
+    sections this repo declares). Feeds the cross-area service catalog.
+  triggers:
+    discovery_hint: |
+      Intent-level. The profile changes when the tool gains/loses a major
+      surface (a new console script, a served API). Track by age.
+    paths: []
+    max_age_days: 180
+  produces:
+    type: manual
+  adapted_heuristic: null
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+- path: docs/01-overview/context.md
+  section: overview
+  kind: manual
+  description: |
+    Upstream and downstream systems (who invokes mad-cli, what mad-cli drives).
+    Upstream: the operator on their host, PyPI (mad-cli is `pip install`ed).
+    Downstream: the Docker daemon + Docker Compose, the mad-edge container it
+    builds and runs, PyPI (mad-edge version lookup) and the host filesystem
+    (`~/.config/mad`, the data path). Ideally a small mermaid context diagram.
+  triggers:
+    discovery_hint: |
+      Architectural intent. Changes when new upstream/downstream systems are
+      introduced — not derivable from a single source path.
+    paths: []
+    max_age_days: 180
+  produces:
+    type: manual
+  adapted_heuristic: null
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+- path: docs/01-overview/scope.md
+  section: overview
+  kind: manual
+  description: |
+    What mad-cli explicitly does NOT do (non-goals / out of scope). For mad-cli
+    this is load-bearing: it installs and manages the mad-edge container — it
+    NEVER runs agents, NEVER parses LLM output, and NEVER talks to the agent
+    runtime; that is mad-edge's job, inside the container. Capture these
+    boundaries.
+  triggers:
+    discovery_hint: |
+      Statement of intent. No code path determines it. Track by age.
+    paths: []
+    max_age_days: 365
+  produces:
+    type: manual
+  adapted_heuristic: null
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+- path: docs/01-overview/glossary.md
+  section: overview
+  kind: manual
+  description: |
+    The domain language used across these docs; one term = one definition
+    (instance, config root, .env, compose project, edge package, key, builtin
+    key, legacy layout, pin, ...).
+  triggers:
+    discovery_hint: |
+      Vocabulary; curated as the domain language evolves. No path trigger.
+    paths: []
+    max_age_days: 365
+  produces:
+    type: manual
+  adapted_heuristic: null
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+
+# ---- 02 architecture ----------------------------------------------------
+- path: docs/02-architecture/overview.md
+  section: architecture
+  kind: manual
+  description: |
+    Internal architecture narrative and a component diagram in mermaid. Name the
+    real style: a framework-free engine (`mad_cli.core` + `mad_cli.templates`)
+    under a Typer/Rich surface (`mad_cli.commands` + `mad_cli.ui`) wired by
+    `mad_cli.app`, and how a command flows surface -> core -> Docker/filesystem.
+    Reference CONTRACTS.md as the frozen integration seam.
+  triggers:
+    discovery_hint: |
+      Architectural narrative requires judgement. Track by age; no single path
+      trigger fires it directly.
+    paths: []
+    max_age_days: 180
+  produces:
+    type: manual
+  adapted_heuristic: null
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+- path: docs/02-architecture/components.md
+  section: architecture
+  kind: heuristic
+  description: |
+    Internal modules and their responsibilities / boundaries: the framework-free
+    engine modules under `core/` (paths, envfile, instance, keyspec, templates,
+    compose, docker_check, claude_creds, pypi), the packaged `templates/`, and
+    the Typer surface (`commands/`, `ui/`, `app.py`). Name the layering rule
+    that separates them.
+  triggers:
+    discovery_hint: |
+      The broad source root where module boundaries live (`src/mad_cli/**`). Any
+      change there suggests verifying the boundaries narrative is still right.
+    paths:
+    - src/mad_cli/core/**
+    - src/mad_cli/commands/**
+    - src/mad_cli/ui/**
+    - src/mad_cli/templates/**
+    hint: |
+      Module layout changed — verify components.md still reflects the internal
+      boundaries (a new core module, a new command group, a new template).
+  produces:
+    type: manual
+  adapted_heuristic: |
+    Re-author when a new module appears under `core/` (add its one-line
+    responsibility), when a new command module appears under `commands/` (wire it
+    into the surface table), when a new `*.tmpl` is added under `templates/`, or
+    when the core<->surface layering rule (CLAUDE.md hard rule 3 / CONTRACTS.md)
+    changes. Renames within an existing module are captured by source-tree.md and
+    do NOT need a rewrite.
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+- path: docs/02-architecture/source-tree.md
+  section: architecture
+  kind: deterministic
+  description: |
+    Exact ASCII tree of the application source root, from git-tracked files
+    only — verbatim, deterministic, CI-diffable.
+  triggers:
+    discovery_hint: |
+      The application source root (the package that holds production code).
+    paths:
+    - src/mad_cli/**
+  produces:
+    type: script
+    command: [gen_docs, source-tree]
+    params_needed:
+      root:
+        description: Repo-relative path to the application source root.
+        type: string
+    params:
+      root: src/mad_cli
+  adapted_heuristic: null
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+- path: docs/02-architecture/test-tree.md
+  section: architecture
+  kind: deterministic
+  description: |
+    Exact ASCII tree of the test root, from git-tracked files only — verbatim,
+    deterministic, CI-diffable.
+  triggers:
+    discovery_hint: |
+      The test root (unit/integration/e2e).
+    paths:
+    - tests/**
+  produces:
+    type: script
+    command: [gen_docs, test-tree]
+    params_needed:
+      root:
+        description: Repo-relative path to the test root.
+        type: string
+    params:
+      root: tests
+  adapted_heuristic: null
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+
+# ---- 03 contracts -------------------------------------------------------
+# A CLI's "interface contract" is its command surface, not an HTTP/OpenAPI dump.
+# `cli.md` is the authoritative reference for every command and its real flags,
+# and `external-dependencies.md` covers the third parties the CLI drives.
+- path: docs/03-contracts/cli.md
+  section: contracts
+  kind: heuristic
+  description: |
+    The complete `mad` command surface: every command and subcommand with its
+    real arguments, options and defaults, grouped by family (install, lifecycle,
+    inventory, versions, keys, config). The operator-facing contract — must stay
+    faithful to the Typer definitions, not to memory.
+  triggers:
+    discovery_hint: |
+      The Typer application wiring and the command modules that define the
+      surface (arguments, options, help text).
+    paths:
+    - src/mad_cli/app.py
+    - src/mad_cli/commands/**
+    hint: |
+      A command, argument or option was added/removed/renamed — re-derive the
+      reference from the Typer definitions.
+  produces:
+    type: manual
+  adapted_heuristic: |
+    Re-author when `app.py` registers/removes a command or sub-typer, or when any
+    module under `commands/` adds, removes or renames a `typer.Argument` /
+    `typer.Option` (or changes its default or help). Read the options straight
+    from the source — do not infer them. Keep the family grouping (install,
+    lifecycle start|stop|restart|status|logs|shell, inventory list|info|adopt,
+    versions|update, keys set|list|remove, config get|set|unset) in sync with the
+    registration order in `app.py`.
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+- path: docs/03-contracts/external-dependencies.md
+  section: contracts
+  kind: heuristic
+  description: |
+    Third parties mad-cli relies on and their quirks (failure modes, fail-soft
+    behaviour): the Docker CLI + Docker Compose v2 it shells out to, PyPI (both
+    for its own install and the mad-edge version lookup over the JSON API), and
+    the container image it renders (node:20-slim base, the mad-edge PyPI package,
+    the Claude Code / OpenCode / gh CLIs baked in). Plus its own runtime deps
+    (typer, rich).
+  triggers:
+    discovery_hint: |
+      The dependency manifest and the outbound integration modules where third
+      parties are driven (the compose runner, docker detection, the PyPI lookup)
+      and the rendered container templates.
+    paths:
+    - pyproject.toml
+    - src/mad_cli/core/compose.py
+    - src/mad_cli/core/docker_check.py
+    - src/mad_cli/core/pypi.py
+    - src/mad_cli/templates/**
+  produces:
+    type: manual
+  adapted_heuristic: |
+    Re-author when a runtime dependency in `pyproject.toml` changes, when the
+    `docker compose` argv or health probe in `compose.py` changes, when the
+    Docker/daemon/compose-v2 detection in `docker_check.py` changes, when the
+    PyPI JSON endpoint or fail-soft behaviour in `pypi.py` changes, or when a
+    `*.tmpl` under `templates/` changes what is installed inside the container
+    (base image, agent CLIs, the mad-edge package/entrypoint).
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+
+# ---- 04 conventions -----------------------------------------------------
+- path: docs/04-conventions/cli-design.md
+  section: conventions
+  kind: heuristic
+  description: |
+    CLI conventions: the Typer app shape (`no_args_is_help`, eager `--version`),
+    the optional-instance resolution pattern (sole instance via
+    `default_instance`, else an actionable error), the non-interactive contract
+    (`--yes` / non-TTY: never block, use flags+defaults or name the missing
+    flag), secret masking on every display, and the `typer.Exit(1)` error path.
+  triggers:
+    discovery_hint: |
+      The Typer surface and the shared UI helpers where these conventions are
+      observable (the app wiring, the command modules, the prompt/console
+      helpers).
+    paths:
+    - src/mad_cli/app.py
+    - src/mad_cli/commands/**
+    - src/mad_cli/ui/**
+    hint: |
+      Surface or UI-helper code changed — verify the cli-design conventions.
+  produces:
+    type: manual
+  adapted_heuristic: |
+    Re-author when the Typer app options change (`no_args_is_help`,
+    `add_completion`, the `--version` callback), when the instance-resolution
+    helper pattern in the command modules changes, when the non-interactive
+    contract in `ui/prompts.py` (`PromptRequiredError`, non-TTY behaviour)
+    changes, or when the masking rule (`commands/_common.is_secret_key`,
+    `core/keyspec.mask`) changes.
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+- path: docs/04-conventions/layering.md
+  section: conventions
+  kind: heuristic
+  description: |
+    The layering rule (CLAUDE.md hard rule 3, CONTRACTS.md): `mad_cli.core` and
+    `mad_cli.templates` never import `typer`/`rich`; `mad_cli.commands` /
+    `mad_cli.ui` never touch `subprocess` or the filesystem directly — they go
+    through `core`. `mad_cli.core` is `mypy --strict`. Explain how the rule is
+    upheld (there is no import-linter — it is a review + mypy convention).
+  triggers:
+    discovery_hint: |
+      The two sides of the boundary (the engine and the surface) plus the frozen
+      contract file that pins the seam.
+    paths:
+    - src/mad_cli/core/**
+    - src/mad_cli/templates/**
+    - src/mad_cli/commands/**
+    - src/mad_cli/ui/**
+    - CONTRACTS.md
+    hint: |
+      Code either side of the core<->surface boundary changed — verify the
+      layering rule still holds and CONTRACTS.md is in sync.
+  produces:
+    type: manual
+  adapted_heuristic: |
+    Re-author when the layering rule in CLAUDE.md hard rule 3 changes, when a
+    signature in CONTRACTS.md changes, when a `core/` or `templates/` module
+    starts importing `typer`/`rich` (a violation to flag), when a
+    `commands/`/`ui/` module starts touching `subprocess`/the filesystem
+    directly, or when the mypy-strict scope (`[[tool.mypy.overrides]]` on
+    `mad_cli.core.*`) changes.
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+- path: docs/04-conventions/quality.md
+  section: conventions
+  kind: heuristic
+  description: |
+    Linters / formatters and the quality gates: ruff (lint + format,
+    line-length 100, rule set E/F/I/UP/B/SIM), mypy (strict on `mad_cli.core`),
+    pip-audit, and the pytest configuration (timeout, the `docker` marker
+    deselected by default). Trace every claim to pyproject.toml and the CI.
+  triggers:
+    discovery_hint: |
+      The linter/formatter/quality config for this repo (pyproject.toml) and the
+      CI that enforces it.
+    paths:
+    - pyproject.toml
+    - .github/workflows/ci.yml
+    hint: |
+      Lint/format/type/test config changed — verify quality.md.
+  produces:
+    type: manual
+  adapted_heuristic: |
+    Re-author when `[tool.ruff]`, `[tool.ruff.lint]`, `[tool.mypy]`, the
+    `[[tool.mypy.overrides]]` strict scope, `[tool.pytest.ini_options]`
+    (timeout, markers, addopts) or the dev dependency set in pyproject.toml
+    change, or when the `quality`/`test`/`audit` jobs in `ci.yml` change what
+    they enforce.
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+- path: docs/04-conventions/testing-strategy.md
+  section: conventions
+  kind: heuristic
+  description: |
+    Test layout and strategy: unit tests under `tests/unit/{core,commands,ui}`,
+    the Docker-free contract (the `docker` marker is deselected by default; every
+    subprocess/Docker call is mocked so `pytest -q` passes with no daemon),
+    Typer `CliRunner` tests that mock `mad_cli.core` throughout, and the 90%
+    coverage floor on `mad_cli.core` enforced in CI.
+  triggers:
+    discovery_hint: |
+      The test root and the test config this repo uses.
+    paths:
+    - tests/**
+    - pyproject.toml
+    - .github/workflows/ci.yml
+    hint: |
+      Test infrastructure, markers or coverage gate changed — verify
+      testing-strategy.md.
+  produces:
+    type: manual
+  adapted_heuristic: |
+    Re-author when the layout under `tests/` reorganizes, when the `docker`
+    marker or `addopts` in pyproject.toml change the default selection, when the
+    `--cov-fail-under` threshold in `ci.yml` changes, or when the mocking
+    convention (mock `mad_cli.core`, real-core fixtures like
+    `make_real_instance`) changes.
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+
+# ---- 05 operations ------------------------------------------------------
+- path: docs/05-operations/installation.md
+  section: operations
+  kind: heuristic
+  description: |
+    How to install and run mad-cli itself: `pip install mad-cli`, the supported
+    Python versions, the `mad` console script, and the first-run flow (`mad
+    install` renders the instance files, then `mad start`). Distinguish
+    installing the CLI from what the CLI then provisions.
+  triggers:
+    discovery_hint: |
+      The packaging metadata and the operator-facing entrypoints: the project
+      metadata / console script, the README quickstart, and the install command.
+    paths:
+    - pyproject.toml
+    - README.md
+    - src/mad_cli/commands/install.py
+    hint: |
+      Packaging, the quickstart, or the install command changed — verify
+      installation.md.
+  produces:
+    type: manual
+  adapted_heuristic: |
+    Re-author when `[project]` metadata in pyproject.toml changes
+    (`requires-python`, the `mad` console script, dependencies), when the README
+    quickstart changes, or when `commands/install.py` changes the guided-install
+    flow (Docker preflight, the collected parameters, `--no-start`).
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+- path: docs/05-operations/configuration.md
+  section: operations
+  kind: heuristic
+  description: |
+    Configuration keys (NEVER values), with purpose and where they live. Two
+    layers: mad-cli's own host-side setting (`MAD_CLI_CONFIG_DIR`) and the
+    per-instance `.env` keys it writes and manages (MAD_INSTANCE, MAD_HOST_PORT,
+    MAD_DATA_PATH, MAD_VERSION, MAD_AGENT_TIMEOUT_S, PUID/PGID, the git identity,
+    and the credential keys from the key registry). Mark secrets as such.
+  triggers:
+    discovery_hint: |
+      The config surface: the config-root resolver, the install command that
+      assembles the .env, the config/keys editors, and the key registry.
+    paths:
+    - src/mad_cli/core/paths.py
+    - src/mad_cli/commands/install.py
+    - src/mad_cli/commands/config.py
+    - src/mad_cli/core/keyspec.py
+    hint: |
+      A key was added/dropped/renamed (in the .env assembly, the config editor,
+      or the key registry) — verify configuration.md.
+  produces:
+    type: manual
+  adapted_heuristic: |
+    Re-author when `MAD_CLI_CONFIG_DIR` handling in `paths.py` changes, when
+    `install.py` adds/removes a key written into the `.env`, when the validators
+    or compose-baked-key set in `config.py` change, or when a `KeySpec` is
+    added/removed in `keyspec.BUILTIN_KEYS`. This doc is the authoritative key
+    inventory; keep secrets masked and never print a value.
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+- path: docs/05-operations/ci-cd.md
+  section: operations
+  kind: heuristic
+  description: |
+    Pipeline stages and what gates each one. Covers the three workflows: `ci`
+    (ruff, mypy, pytest on 3.11/3.12 with a 90% core-coverage gate, pip-audit,
+    build + twine check), `release` (python-semantic-release + PyPI trusted
+    publishing, path-gated) and `testpypi-preview` (per-PR .dev build published
+    to TestPyPI and verified). The job/step structure plus the intent of each
+    gate; authored, not regenerated in CI.
+  triggers:
+    discovery_hint: |
+      The CI/CD workflows directory.
+    paths:
+    - .github/workflows/**
+    hint: |
+      Workflows changed — update the job/step listing and the narrative of what
+      each stage gates.
+  produces:
+    type: script
+    command: [gen_docs, ci-cd]
+    params_needed:
+      workflows_dir:
+        description: Directory containing CI/CD workflow files.
+        type: string
+    params:
+      workflows_dir: .github/workflows
+  adapted_heuristic: |
+    Re-author when any file under `.github/workflows/` is added, removed or
+    materially changed. Keep the job/step listing in sync and explain what each
+    gate enforces (coverage floor, path-gated release trigger, the
+    `TESTPYPI_ENABLED` opt-in, the docs-validate/docs-sync callers).
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+- path: docs/05-operations/release.md
+  section: operations
+  kind: heuristic
+  description: |
+    How mad-cli is versioned and published: python-semantic-release driven by
+    Conventional Commits with the closed public scope set `{cli, config,
+    templates, deps}`, the 0.x policy (feat demoted to a patch tag; minor/major
+    always deliberate via `BREAKING CHANGE:` or the `release_kind` dispatch), the
+    path-gated release trigger, PyPI Trusted Publishing, and the TestPyPI preview
+    round-trip. Trace to pyproject.toml `[tool.semantic_release]` and the
+    release/testpypi workflows.
+  triggers:
+    discovery_hint: |
+      The release/publish workflows and the semantic-release configuration.
+    paths:
+    - .github/workflows/release.yml
+    - .github/workflows/testpypi-preview.yml
+    - pyproject.toml
+    hint: |
+      The release/preview workflow or the semantic-release config changed —
+      verify release.md.
+  produces:
+    type: manual
+  adapted_heuristic: |
+    Re-author when `[tool.semantic_release]` in pyproject.toml changes
+    (`patch_tags`/`minor_tags`, `major_on_zero`, `tag_format`, `build_command`),
+    when the path-gate or `release_kind`/`manual_publish` inputs in `release.yml`
+    change, or when `testpypi-preview.yml` changes its build/publish/verify jobs
+    or the `TESTPYPI_ENABLED` gate. Cross-reference CLAUDE.md hard rules 2 and 6.
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65
+
+# ---- 06 history ---------------------------------------------------------
+# `changelog` is heuristic, sourced from the semantic-release CHANGELOG.md at the
+# repo root (grouped by Features/Fixes/... per release) — NOT a raw git log.
+- path: docs/06-history/changelog.md
+  section: history
+  kind: heuristic
+  description: |
+    The package's released versions and what changed in each, mirrored from the
+    semantic-release `CHANGELOG.md` at the repo root. Only released,
+    version-tagged changes a `mad-cli` consumer inherits — NOT a raw git log.
+  triggers:
+    discovery_hint: |
+      The package release changelog — `CHANGELOG.md` at the repo root, generated
+      by python-semantic-release.
+    paths:
+    - CHANGELOG.md
+    hint: |
+      `CHANGELOG.md` changed (a new release was cut) — mirror it faithfully.
+  produces:
+    type: manual
+  adapted_heuristic: |
+    Mirror CHANGELOG.md: keep releases in reverse-chronological order (newest
+    first), preserve the per-release section grouping (Features / Bug Fixes /
+    ...), use the exact commit links from the source, and carry the four-field
+    frontmatter. Do not invent entries — this doc only reflects what
+    semantic-release has already cut.
+  acknowledged_at_commit: bc1bff6bca7cddd5b4ed12af8d9d51d8be32ab65

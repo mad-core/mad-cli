@@ -1,0 +1,185 @@
+---
+service: mad-cli
+domain: backend
+section: contracts
+source_of_truth: repo
+---
+# CLI Command Reference
+
+The complete `mad` command surface — the operator-facing contract. Every command, argument, option, and default below is drawn from the Typer definitions.
+
+## Instance resolution (shared rule)
+
+Wherever a command takes an optional `INSTANCE` argument or a `--instance` / `-i` option, it is optional when exactly one instance exists (that sole instance is used by default); otherwise you must name it. With zero instances the command errors with a hint to run `mad install`; with several, it errors listing the instance names.
+
+## Global
+
+`mad` is a Typer application. Running it with no arguments prints help.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `--version` | — | Print the version and exit (eager). |
+| (no arguments) | — | `no_args_is_help`: bare `mad` prints help. |
+
+## install
+
+`mad install` — install or reconfigure a mad-edge instance.
+
+Each option is optional, and supplying its flag skips the matching interactive prompt. Re-running against an existing instance pre-fills defaults from its `.env`.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `--name` | `default` | Instance name. |
+| `--port` | `8080` | Host port. |
+| `--data-path` | `~/mad-data` | Host data path. |
+| `--timeout` | `600` | Agent wall-clock seconds. |
+| `--github-token` | required | Agent clones/pushes/PRs. |
+| `--git-name` | — | Git author name. |
+| `--git-email` | — | Git author email. |
+| `--claude-token` | — | Claude OAuth token; run `claude setup-token`. |
+| `--edge-package` | (hidden) | Override the mad-edge package name. |
+| `--edge-version` | — (blank = latest) | Pin mad-edge. |
+| `--yes` / `-y` | — | Non-interactive: use flags + defaults, never prompt. |
+| `--no-start` | — | Write config but don't start. |
+
+Behaviour: Docker preflight (offers to install on Linux, an actionable error elsewhere); writes the instance files under the config dir; creates the data dirs (`workspaces/`, `aws/`, `claude/`); writes Claude credentials if a token was given; prints a masked summary; and unless `--no-start`, builds, starts, and waits for health. In `--yes` / non-TTY mode a missing required value (for example `--github-token`) exits 1 naming the flag.
+
+## Lifecycle
+
+Each lifecycle command takes an optional `INSTANCE` argument (see the shared instance-resolution rule).
+
+| Command | Purpose |
+| --- | --- |
+| `mad start [INSTANCE]` | Build if needed, then up (detached) and wait for health. |
+| `mad stop [INSTANCE]` | Down (stop and remove the containers). |
+| `mad restart [INSTANCE]` | Down, then up (rebuild). |
+| `mad status [INSTANCE]` | Container state, health summary, and URL. |
+| `mad logs [INSTANCE]` | Follow the container logs (interactive). |
+| `mad shell [INSTANCE]` | Open an interactive `bash` inside the container. |
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `INSTANCE` | sole instance | Which instance to act on (optional per the shared rule). |
+
+## Inventory
+
+### `mad list`
+
+List every configured instance.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| (none) | — | Prints a table with columns Name, Port, State, Health, Version. State/health are best-effort; legacy instances are tagged `(legacy)`. |
+
+### `mad info NAME`
+
+Show an instance's paths and `.env` values.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `NAME` | required | Which instance to describe. |
+
+Shows the paths (config dir, compose file, data path) plus the `.env` values, with secrets masked.
+
+### `mad adopt`
+
+Migrate the legacy single-instance layout into `instances/<name>/`.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| (none) | — | Moves `compose.yml` / `.env` / `Dockerfile` / `entrypoint.sh`; the data path is NOT moved. Warns that the compose project name changes and to stop the legacy container first, and asks for confirmation. |
+
+## Versions
+
+### `mad versions [INSTANCE]`
+
+Report the version state of one or all instances.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `INSTANCE` | all instances | Which instance to report; when omitted, reports every instance. |
+
+Prints a table with columns Name / Pinned / Installed / Latest on PyPI / Update. Installed is the version reported by `mad` inside the running container (best-effort; `not running` when stopped). Latest comes from the PyPI JSON API.
+
+### `mad update INSTANCE`
+
+Re-pin and rebuild an instance.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `INSTANCE` | required | Which instance to update. |
+| `--version` | — (omit or blank = track latest) | Pin `MAD_VERSION`. |
+
+Re-pins `MAD_VERSION` in `.env` and rebuilds from scratch (`build --no-cache`, up, wait for health).
+
+## keys
+
+`mad keys` is a sub-app that prints help with no subcommand. Every subcommand takes `--instance` / `-i` (see the shared instance-resolution rule). `keys` is the credential-aware front end over the `.env`.
+
+### `mad keys set KEY [VALUE]`
+
+Set a credential.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `KEY` | required | A builtin id (`claude-oauth`, `anthropic`, `github`, `deepseek`, `linear`, `opencode`) or a custom VAR name matching `[A-Z][A-Z0-9_]*`. |
+| `VALUE` | prompted (masked) when omitted | The value to set. |
+| `--instance` / `-i` | sole instance | Which instance. |
+
+A builtin fans one value out to its env var(s); `claude-oauth` additionally writes the container's `.credentials.json` (`chmod 600`). Ends with a restart hint.
+
+### `mad keys list`
+
+List the keys.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `--instance` / `-i` | sole instance | Which instance. |
+
+Prints a table of the builtin keys (id, env vars, set/unset, masked value) plus any custom secret vars.
+
+### `mad keys remove KEY`
+
+Remove a key.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `KEY` | required | A builtin id (removes its env vars) or a custom var. |
+| `--instance` / `-i` | sole instance | Which instance. |
+
+Removing `claude-oauth` leaves the on-disk credentials file in place and reports its path.
+
+## config
+
+`mad config` is a sub-app that prints help with no subcommand — the general-purpose `.env` editor (`keys` is the credential-aware front end). Every subcommand takes `--instance` / `-i` (see the shared instance-resolution rule).
+
+### `mad config get [KEY]`
+
+Print a value or the whole `.env`.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `KEY` | all keys | Print one value; when omitted, print the whole `.env` as a table. |
+| `--reveal` | — | Show secret-looking values unmasked (masked by default). |
+| `--instance` / `-i` | sole instance | Which instance. |
+
+### `mad config set KEY VALUE`
+
+Write a value.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `KEY` | required | The key to write. |
+| `VALUE` | required | The value to write. |
+| `--instance` / `-i` | sole instance | Which instance. |
+
+Validates `MAD_HOST_PORT` (1–65535) and `MAD_AGENT_TIMEOUT_S` (positive integer); warns that compose-baked keys (`MAD_HOST_PORT`, `MAD_DATA_PATH`) need the instance regenerated to take effect; ends with a restart hint.
+
+### `mad config unset KEY`
+
+Remove a key.
+
+| Option/Arg | Default | Meaning |
+| --- | --- | --- |
+| `KEY` | required | The key to remove. |
+| `--instance` / `-i` | sole instance | Which instance. |
