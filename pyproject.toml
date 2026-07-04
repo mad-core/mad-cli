@@ -78,7 +78,7 @@ addopts = "-m 'not docker'"
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
 version_variables = ["src/mad_cli/__init__.py:__version__"]
-build_command = "python -m build"
+build_command = "python -m pip install build && python -m build"
 commit_parser = "conventional"
 tag_format = "v{version}"
 major_on_zero = false
