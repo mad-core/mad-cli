@@ -103,6 +103,31 @@ def test_empty_and_keys_order() -> None:
     assert env.keys() == ["Z", "A", "M"]
 
 
+def test_add_comment_is_inert_reference() -> None:
+    env = EnvFile.empty()
+    env.set("A", "1")
+    env.add_comment("B=  # a documented but inactive knob")
+    env.add_comment("# already hashed stays as-is")
+    # A comment never becomes an assignment: get()/keys() ignore it entirely.
+    assert env.get("B") is None
+    assert env.keys() == ["A"]
+    rendered = env.render()
+    assert "# B=  # a documented but inactive knob" in rendered
+    assert "# already hashed stays as-is" in rendered
+
+
+def test_add_comment_round_trips_as_comment(tmp_path: Path) -> None:
+    env = EnvFile.empty()
+    env.set("A", "1")
+    env.add_comment("MAD_SSE_HEARTBEAT_S=  # heartbeat seconds")
+    dst = tmp_path / ".env"
+    env.save(dst)
+    reloaded = EnvFile.load(dst)
+    # The reference line reloads as a comment, not as a set key.
+    assert reloaded.get("MAD_SSE_HEARTBEAT_S") is None
+    assert reloaded.keys() == ["A"]
+
+
 def test_save_without_path_raises() -> None:
     env = EnvFile.empty()
     env.set("A", "1")

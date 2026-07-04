@@ -109,6 +109,16 @@ class EnvFile:
         """Remove every assignment of ``key`` (no-op if absent)."""
         self._lines = [line for line in self._lines if not (line.kind == "kv" and line.key == key)]
 
+    def add_comment(self, text: str) -> None:
+        """Append a comment line (used to leave documented, inactive references).
+
+        ``text`` is written verbatim; a leading ``#`` is added if missing. The
+        line is inert — it never shadows an assignment and :meth:`get`/:meth:`keys`
+        ignore it — so it round-trips as a plain reference in the generated file.
+        """
+        rendered = text if text.lstrip().startswith("#") else f"# {text}"
+        self._lines.append(_Line("comment", rendered))
+
     def keys(self) -> list[str]:
         """Return the assignment keys in file order."""
         return [line.key for line in self._lines if line.kind == "kv" and line.key is not None]
