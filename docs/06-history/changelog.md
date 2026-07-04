@@ -9,6 +9,18 @@ source_of_truth: repo
 
 This page mirrors the semantic-release `CHANGELOG.md` at the repo root (consumer-facing, grouped per release) and is not a raw git log.
 
+## v0.3.1 (2026-07-04)
+
+### Bug Fixes
+
+- **templates**: Tolerate host UID/GID collisions when creating the container user ([`cc4a022`](https://github.com/mad-core/mad-cli/commit/cc4a0221a462cf2b1627f35e3cdf7a00a7a491e1)) — `groupadd -g "${PGID}"` fails with exit 4 when the host GID already exists in the base image (e.g. macOS gid 20 is Debian's `dialout` group). Reuse an existing group and allow a duplicate UID (`useradd -o`) instead of failing the build.
+
+## v0.3.0 (2026-07-04)
+
+### Features
+
+- **cli**: Add versions, update and adopt; polish list inventory ([`534ed68`](https://github.com/mad-core/mad-cli/commit/534ed68a3dd3cfe0c074ed7311bdddb36109c9db)) — Add `mad versions [INSTANCE]` (pinned / installed / latest-on-PyPI plus an update-available column), `mad update INSTANCE [--version X]` (re-pins `MAD_VERSION` in the `.env` and rebuilds from scratch), and `mad adopt` (migrates the legacy single-instance layout into `instances/<name>/`). Refresh `mad list` to Name / Port / State / Health / Version with best-effort state and health parsed from `docker compose ps`.
+
 ## v0.2.0 (2026-07-04)
 
 ### Features

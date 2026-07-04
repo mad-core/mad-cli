@@ -34,6 +34,7 @@ class FakeEnvFile:
 
     def __init__(self, data: dict[str, str] | None = None) -> None:
         self.data: dict[str, str] = dict(data or {})
+        self.comments: list[str] = []
         self.path: Path | None = None
 
     @classmethod
@@ -52,6 +53,9 @@ class FakeEnvFile:
 
     def unset(self, key: str) -> None:
         self.data.pop(key, None)
+
+    def add_comment(self, text: str) -> None:
+        self.comments.append(text)
 
     def keys(self) -> list[str]:
         return list(self.data)

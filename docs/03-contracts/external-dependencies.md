@@ -40,7 +40,7 @@ Produced from the packaged templates:
 - `EXPOSE 8000`.
 - A `HEALTHCHECK` that curls `/openapi.json`.
 - The entrypoint authenticates `gh` with `GITHUB_TOKEN`, then execs `<edge-entrypoint> serve --host 0.0.0.0 --port 8000`.
-- `compose.yml` maps `host_port:8000` and bind-mounts `data_path/<instance>/{workspaces, claude, aws:ro}`.
+- `compose.yml` maps `host_port:8000` and bind-mounts `data_path/<instance>/{workspaces, sessions, claude, aws:ro}`; it pins `MAD_SESSIONS_DIR=/sessions` (like `MAD_WORKSPACE_DIR`) so mad-edge's session logs persist on the host across rebuilds.
 
 ## mad-edge relationship
 

@@ -23,7 +23,7 @@ from mad_cli.core.compose import ComposeRunner
 from mad_cli.core.docker_check import check_docker, install_docker_linux
 from mad_cli.core.envfile import EnvFile
 from mad_cli.core.instance import Instance, InstanceNotFoundError, get_instance
-from mad_cli.core.keyspec import mask
+from mad_cli.core.keyspec import BUILTIN_KEYS, mask
 from mad_cli.core.paths import instance_dir
 from mad_cli.core.templates import EDGE_PACKAGE, RenderContext, write_instance_files
 from mad_cli.ui.console import console, error, header, info, ok, run_step, warn
@@ -38,7 +38,27 @@ class _MissingValue(Exception):
         self.flag = flag
 
 
+class _KeyError(Exception):
+    """An ``--set-key`` / extra-key entry could not be applied (bad id or value)."""
+
+
 _NAME_RE = re.compile(r"[a-z0-9][a-z0-9-]*")
+
+# A custom key is written verbatim; it must look like a shell env-var name
+# (matches ``mad keys set``).
+_CUSTOM_KEY_RE = re.compile(r"[A-Z][A-Z0-9_]*")
+
+# Module-level singleton for the repeatable --set-key option (a mutable-typed
+# default may not be an inline call — see flake8-bugbear B008).
+_SET_KEY_OPTION = typer.Option(
+    None,
+    "--set-key",
+    metavar="ID=VALUE",
+    help=(
+        "Extra API key to store, ID=VALUE (repeatable). ID is a builtin "
+        "(deepseek, linear, opencode, github, anthropic) or a custom VAR name."
+    ),
+)
 
 
 def _validate_name(value: str) -> str:
@@ -71,6 +91,80 @@ def _validate_timeout(value: str) -> str:
     if seconds <= 0:
         raise ValueError(f"invalid timeout {value!r}: must be a positive integer")
     return str(seconds)
+
+
+def _validate_retention(value: str) -> str:
+    """A session-log retention: a positive integer number of days, or empty."""
+    value = value.strip()
+    if not value:
+        return ""
+    try:
+        days = int(value)
+    except ValueError:
+        raise ValueError(
+            f"invalid retention {value!r}: must be a positive integer of days, or empty"
+        ) from None
+    if days < 1:
+        raise ValueError(f"invalid retention {value!r}: must be >= 1 (or empty to keep forever)")
+    return str(days)
+
+
+def _split_set_key(item: str) -> tuple[str, str]:
+    """Split an ``ID=VALUE`` --set-key entry, or raise :class:`_KeyError`."""
+    ident, sep, value = item.partition("=")
+    if not sep:
+        raise _KeyError(f"invalid --set-key {item!r}: expected ID=VALUE.")
+    return ident.strip(), value
+
+
+def _apply_key(env: EnvFile, ident: str, value: str, applied: list[str]) -> None:
+    """Write a builtin (fanned out) or custom key into ``env``.
+
+    Appends every env var it touched to ``applied`` (for the summary). Rejects
+    ``claude-oauth`` — it has its own ``--claude-token`` flag because it also
+    materialises the container credentials file. Raises :class:`_KeyError` on a
+    bad id so the caller decides whether to abort (flags) or re-prompt (loop).
+    """
+    spec = BUILTIN_KEYS.get(ident)
+    if spec is not None:
+        if spec.writes_claude_credentials:
+            raise _KeyError(
+                f"{ident!r} cannot be set with --set-key; use --claude-token "
+                "(it also writes the container credentials file)."
+            )
+        for var in spec.env_vars:
+            env.set(var, value)
+            applied.append(var)
+        return
+    if _CUSTOM_KEY_RE.fullmatch(ident):
+        env.set(ident, value)
+        applied.append(ident)
+        return
+    raise _KeyError(
+        f"unknown key {ident!r}: use a builtin id ({', '.join(BUILTIN_KEYS)}) "
+        "or an env-var name matching [A-Z][A-Z0-9_]*."
+    )
+
+
+def _prompt_extra_keys(env: EnvFile, applied: list[str]) -> None:
+    """Interactive mini-loop to add extra API keys after the main credentials."""
+    if not confirm(
+        "Configure additional API keys now? (deepseek, linear, opencode, or custom)",
+        default=False,
+    ):
+        return
+    while True:
+        ident = ask("Key id (deepseek, linear, opencode) or a custom VAR name").strip()
+        if not ident:
+            break
+        value = ask(f"Value for {ident}", secret=True)
+        try:
+            _apply_key(env, ident, value, applied)
+        except _KeyError as exc:
+            warn(str(exc))
+            continue
+        if not confirm("Add another?", default=False):
+            break
 
 
 def _interactive(assume_yes: bool) -> bool:
@@ -155,6 +249,7 @@ def _print_summary(
     data_dir: Path,
     timeout: int,
     config_dir: Path,
+    extra_key_vars: list[str],
 ) -> None:
     table = Table(show_header=False, box=None, pad_edge=False)
     table.add_column("key", style="bold cyan", no_wrap=True)
@@ -162,12 +257,29 @@ def _print_summary(
     table.add_row("Instance", name)
     table.add_row("Port", str(port))
     table.add_row("Data path", str(data_dir))
+    table.add_row("Sessions", str(data_dir / name / "sessions"))
     table.add_row("Timeout", f"{timeout}s")
+    retention = env.get("MAD_SESSIONS_RETENTION_DAYS")
+    table.add_row("Session retention", f"{retention} days" if retention else "keep forever")
     table.add_row("Config dir", str(config_dir))
-    for key in ("GITHUB_TOKEN", "_CLAUDE_OAUTH_TOKEN"):
+
+    shown: set[str] = set()
+    for key in ("GITHUB_TOKEN", "_CLAUDE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"):
         value = env.get(key)
         if value:
             table.add_row(key, mask(value))
+        shown.add(key)
+    shown.add("GH_TOKEN")  # fanned out from GITHUB_TOKEN; shown once above
+    for var in extra_key_vars:
+        if var in shown:
+            continue
+        shown.add(var)
+        value = env.get(var)
+        if value:
+            table.add_row(var, mask(value))
+
+    mcp = env.get("MAD_MCP_ALLOWED_HOSTS")
+    table.add_row("MCP allowed hosts", mcp if mcp else "disabled")
     console.print(Panel(table, title="Configuration complete", border_style="green", expand=False))
 
 
@@ -193,6 +305,22 @@ def install(
         None,
         "--claude-token",
         help="Claude OAuth token — run `claude setup-token` on any machine with Claude Code.",
+    ),
+    anthropic_api_key: str | None = typer.Option(
+        None,
+        "--anthropic-api-key",
+        help="Anthropic API key (optional — alternative billing to the Claude OAuth token).",
+    ),
+    set_key: list[str] | None = _SET_KEY_OPTION,
+    retention_days: str | None = typer.Option(
+        None,
+        "--retention-days",
+        help="Session log retention in days, >= 1 (omit to keep session logs forever).",
+    ),
+    mcp_allowed_hosts: str | None = typer.Option(
+        None,
+        "--mcp-allowed-hosts",
+        help="MCP allowed hosts for DNS-rebinding protection (comma-separated).",
     ),
     edge_package: str | None = typer.Option(
         None, "--edge-package", hidden=True, help="Override the mad-edge package name."
@@ -263,6 +391,14 @@ def install(
             default=prior("MAD_AGENT_TIMEOUT_S", "600"),
             validator=_validate_timeout,
         )
+        retention_value = _collect(
+            interactive=interactive,
+            flag=retention_days,
+            flag_name="--retention-days",
+            prompt="Session log retention in days (empty = keep forever)",
+            default=prior("MAD_SESSIONS_RETENTION_DAYS", ""),
+            validator=_validate_retention,
+        )
         github_value = _collect(
             interactive=interactive,
             flag=github_token,
@@ -294,6 +430,17 @@ def install(
             default=prior("_CLAUDE_OAUTH_TOKEN", ""),
             secret=True,
         )
+        anthropic_value = _collect(
+            interactive=interactive,
+            flag=anthropic_api_key,
+            flag_name="--anthropic-api-key",
+            prompt=(
+                "Anthropic API key (optional — alternative billing to the Claude "
+                "OAuth token, Enter to skip)"
+            ),
+            default=prior("ANTHROPIC_API_KEY", ""),
+            secret=True,
+        )
         edge_package_value = _collect(
             interactive=interactive,
             flag=edge_package,
@@ -307,6 +454,16 @@ def install(
             flag_name="--edge-version",
             prompt="mad-edge version pin (blank = latest)",
             default=prior("MAD_VERSION", ""),
+        )
+        mcp_hosts_value = _collect(
+            interactive=interactive,
+            flag=mcp_allowed_hosts,
+            flag_name="--mcp-allowed-hosts",
+            prompt=(
+                "MCP allowed hosts for DNS-rebinding protection "
+                "(comma-separated, Enter to leave disabled)"
+            ),
+            default=prior("MAD_MCP_ALLOWED_HOSTS", None),
         )
     except _MissingValue as exc:
         error(
@@ -343,6 +500,42 @@ def install(
     env.set("GIT_COMMITTER_EMAIL", git_email_value)
     env.set("MAD_AGENT_TIMEOUT_S", timeout_value)
     env.set("_CLAUDE_OAUTH_TOKEN", claude_value)
+    if anthropic_value:
+        env.set("ANTHROPIC_API_KEY", anthropic_value)
+
+    # Extra API keys: --set-key flags first (abort on a bad entry), then the
+    # interactive mini-loop (re-prompts on a bad entry instead of aborting).
+    extra_key_vars: list[str] = []
+    try:
+        for item in set_key or []:
+            ident, value = _split_set_key(item)
+            _apply_key(env, ident, value, extra_key_vars)
+    except _KeyError as exc:
+        error(str(exc))
+        raise typer.Exit(1) from exc
+    if interactive:
+        _prompt_extra_keys(env, extra_key_vars)
+
+    # Session-log retention: a value activates it; otherwise leave a documented,
+    # inactive reference so the operator knows the knob exists (keep forever).
+    if retention_value:
+        env.set("MAD_SESSIONS_RETENTION_DAYS", retention_value)
+    else:
+        env.add_comment(
+            "MAD_SESSIONS_RETENTION_DAYS=  # session log retention in days; unset = keep forever"
+        )
+
+    # MCP DNS-rebinding protection: commented reference when left disabled.
+    if mcp_hosts_value:
+        env.set("MAD_MCP_ALLOWED_HOSTS", mcp_hosts_value)
+    else:
+        env.add_comment(
+            "MAD_MCP_ALLOWED_HOSTS=  # comma-separated allowed hosts; unset = protection disabled"
+        )
+
+    # SSE keep-alive heartbeat is never prompted — leave it as a reference knob.
+    if env.get("MAD_SSE_HEARTBEAT_S") is None:
+        env.add_comment("MAD_SSE_HEARTBEAT_S=  # SSE keep-alive heartbeat in seconds")
 
     ctx = RenderContext(
         instance=name_value,
@@ -362,6 +555,7 @@ def install(
 
     instance_data = data_dir / name_value
     (instance_data / "workspaces").mkdir(parents=True, exist_ok=True)
+    (instance_data / "sessions").mkdir(parents=True, exist_ok=True)
     (instance_data / "aws").mkdir(parents=True, exist_ok=True)
     claude_dir = instance_data / "claude"
     if claude_value:
@@ -378,6 +572,7 @@ def install(
         data_dir=data_dir,
         timeout=timeout_int,
         config_dir=config_dir,
+        extra_key_vars=extra_key_vars,
     )
 
     if no_start:
