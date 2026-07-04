@@ -10,8 +10,17 @@ The third parties mad-cli relies on, and their quirks and failure modes.
 
 ## Python runtime dependencies
 
+Base (always installed):
+
 - `typer >= 0.12`
 - `rich >= 13.7`
+
+Optional `server` extra (`pip install 'mad-cli[server]'`, for `mad serve` / the HTTP API):
+
+- `fastapi >= 0.110`
+- `uvicorn >= 0.29`
+
+The base CLI never imports these — `import mad_cli.app` must not pull in FastAPI. When the extra is absent, `mad service install` can provision a dedicated venv under `config_root()/server-venv` and install `mad-cli[server]` there (from PyPI, or a local wheel via `--wheel`), shelling out to `python -m venv` and `pip`.
 
 ## Docker CLI and Docker Compose v2
 
@@ -41,6 +50,10 @@ Produced from the packaged templates:
 - A `HEALTHCHECK` that curls `/openapi.json`.
 - The entrypoint authenticates `gh` with `GITHUB_TOKEN`, then execs `<edge-entrypoint> serve --host 0.0.0.0 --port 8000`.
 - `compose.yml` maps `host_port:8000` and bind-mounts `data_path/<instance>/{workspaces, sessions, claude, aws:ro}`; it pins `MAD_SESSIONS_DIR=/sessions` (like `MAD_WORKSPACE_DIR`) so mad-edge's session logs persist on the host across rebuilds.
+
+## Host-side service managers
+
+`mad service install` renders a boot-persistent service file from the packaged `mad-cli.service.tmpl` (systemd **user** unit) or `com.mad-core.mad-cli.plist.tmpl` (launchd LaunchAgent) and, unless `--render-to` is given, activates it via `systemctl --user` (Linux) or `launchctl` (macOS). These are host-side templates, not part of the container image.
 
 ## mad-edge relationship
 

@@ -17,7 +17,18 @@ Line length 100; `src = ["src", "tests"]`; lint select = `E`, `F`, `I`, `UP`,
 ## mypy
 
 `python_version = 3.11`, `mypy_path = src`, `packages = ["mad_cli"]`, with a
-strict override on `mad_cli.core.*`. Run `mypy`.
+strict override on `mad_cli.core.*` (which now includes the use-case layer
+`mad_cli.core.usecases.*`) and an `ignore_missing_imports` override for
+`uvicorn.*` (it ships no stubs). `mad_cli.server` is checked in the normal
+(non-strict) scope. Run `mypy`.
+
+## Extras
+
+`pyproject.toml` declares an optional `server` extra (`fastapi`, `uvicorn`) for
+the HTTP API; the base install stays `typer` + `rich`. The `dev` extra includes
+the server packages plus `httpx` so CI exercises the API via
+`fastapi.testclient.TestClient`. The wheel must import without the extra
+(`import mad_cli.app` never pulls in FastAPI).
 
 ## pip-audit
 
