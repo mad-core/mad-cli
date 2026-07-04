@@ -1,6 +1,53 @@
 # CHANGELOG
 
 
+## v0.2.0 (2026-07-04)
+
+### Features
+
+- **cli**: Add `mad keys` and `mad config` commands
+  ([`a525213`](https://github.com/mad-core/mad-cli/commit/a525213af6b5bd6173f9dbcd2308f46af2a3e20c))
+
+Add two Typer sub-apps for v0.2 credential and configuration management, wired into the root app
+  with minimal footprint.
+
+`mad keys set|list|remove` manages credentials in an instance's .env: builtin keys from the keyspec
+  registry fan a single value out to all their env vars (e.g. github -> GITHUB_TOKEN + GH_TOKEN),
+  claude-oauth additionally materialises the container's .credentials.json (chmod 600) under
+  <data_path>/<instance>/claude, and arbitrary [A-Z][A-Z0-9_]* names are written verbatim. Values
+  are always masked on display; removing claude-oauth leaves the on-disk credentials file in place
+  and reports where it is.
+
+`mad config get|set|unset` is the general-purpose .env editor: get masks secret-looking values
+  unless --reveal, set validates MAD_HOST_PORT and MAD_AGENT_TIMEOUT_S and warns that compose-baked
+  keys need a regenerate to take effect, and every mutation ends with a restart hint.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01GWHBALtjHVd176YddWc9YP
+
+Signed-off-by: Jose Salamanca <jose.salamancacoy@gmail.com>
+
+### Testing
+
+- Cover keys/config against the real core
+  ([`082ea6a`](https://github.com/mad-core/mad-cli/commit/082ea6a1944d3b8687caa75d41d760c6b4683619))
+
+Add a make_real_instance fixture that writes instances/<name>/.env under a scratch
+  MAD_CLI_CONFIG_DIR so the command tests exercise the unmocked engine end to end. Cover the builtin
+  fan-out, the claude-oauth credentials file (0600) and its retention on remove, custom vars,
+  masking, validation, instance resolution and the empty-config hint.
+
+Also make the --version test version-agnostic: it pinned "0.1.0" and broke when release automation
+  bumped __version__ to 0.1.1; it now asserts the output equals the package version.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01GWHBALtjHVd176YddWc9YP
+
+Signed-off-by: Jose Salamanca <jose.salamancacoy@gmail.com>
+
+
 ## v0.1.1 (2026-07-04)
 
 ### Chores

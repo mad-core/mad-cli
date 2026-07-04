@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mad-cli"
-version = "0.1.1"
+version = "0.2.0"
 description = "Operator CLI for Mad — guided install, lifecycle, configuration, keys and version management for mad-edge containers."
 readme = "README.md"
 license = { file = "LICENSE" }
