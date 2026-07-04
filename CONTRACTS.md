@@ -145,6 +145,22 @@ def mask(value: str) -> str       # "sk-a…f3" style masking, safe for short st
 def latest_version(package: str, timeout_s: float = 5.0) -> str | None   # pypi JSON API via urllib
 ```
 
+## mad_cli.core.profiles
+
+```python
+class ProfileNotFoundError(Exception): ...
+
+IDENTITY_KEYS: tuple[str, ...]   # instance-identity keys a profile never carries:
+                                 # MAD_INSTANCE, MAD_HOST_PORT, PUID, PGID, MAD_DATA_PATH, MAD_VERSION
+
+def profiles_root() -> Path            # config_root() / "profiles"
+def profile_path(name: str) -> Path    # profiles_root()/<name>.env (validates name: [a-z0-9][a-z0-9-]*)
+def list_profiles() -> list[str]       # stored profile names, sorted (empty when none)
+def load_profile(name: str) -> EnvFile # raises ProfileNotFoundError
+def save_profile(name: str, env: EnvFile) -> Path  # writes profiles/<name>.env, chmod 0600; returns path
+def delete_profile(name: str) -> None  # raises ProfileNotFoundError
+```
+
 ## mad_cli.ui.console / mad_cli.ui.prompts
 
 ```python
@@ -167,8 +183,10 @@ def main() -> None    # console-script entry point
 
 # commands.install  → `mad install`
 #   options: --name --port --data-path --github-token --claude-token --git-name --git-email
-#            --timeout --edge-package --edge-version --yes --no-start
+#            --timeout --edge-package --edge-version --profile --yes --no-start
+#   --profile NAME: a profile's values seed the wizard defaults (explicit flag > profile > builtin).
 # commands.lifecycle → `mad start|stop|restart|status|logs|shell [INSTANCE]`
 #   INSTANCE optional when exactly one instance exists (default_instance()).
 # commands.instances → `mad list`, `mad info NAME`
+# commands.profiles  → `mad profiles create|list|show|delete|apply` (add_typer name="profiles")
 ```

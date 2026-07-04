@@ -245,6 +245,82 @@ def test_prompt_extra_keys_loop_rejects_then_continues(monkeypatch: pytest.Monke
     assert applied == ["MYVAR"]
 
 
+def _seed_profile(name: str, **values: str) -> None:
+    from mad_cli.core.envfile import EnvFile
+    from mad_cli.core.profiles import save_profile
+
+    env = EnvFile.empty()
+    for key, value in values.items():
+        env.set(key, value)
+    save_profile(name, env)
+
+
+def test_install_profile_supplies_wizard_defaults(
+    cli: CliRunner, install_mocks: SimpleNamespace, cli_config_dir: Path
+) -> None:
+    # A profile provides the GitHub token and timeout, so --yes succeeds without
+    # either flag and both values flow into the instance .env as defaults.
+    _seed_profile("prod", GITHUB_TOKEN="ghp_fromprofile", MAD_AGENT_TIMEOUT_S="1234")
+
+    result = cli.invoke(
+        app, ["install", "--yes", "--name", "web", "--no-start", "--profile", "prod"]
+    )
+    assert result.exit_code == 0, result.output
+
+    _, _, env = install_mocks.write_instance_files.call_args.args
+    assert env.data["GITHUB_TOKEN"] == "ghp_fromprofile"
+    assert env.data["GH_TOKEN"] == "ghp_fromprofile"
+    assert env.data["MAD_AGENT_TIMEOUT_S"] == "1234"
+
+
+def test_install_explicit_flag_beats_profile(
+    cli: CliRunner, install_mocks: SimpleNamespace, cli_config_dir: Path
+) -> None:
+    _seed_profile("prod", GITHUB_TOKEN="ghp_fromprofile", MAD_AGENT_TIMEOUT_S="1234")
+
+    result = cli.invoke(
+        app,
+        [
+            "install",
+            "--yes",
+            "--name",
+            "web",
+            "--no-start",
+            "--profile",
+            "prod",
+            "--timeout",
+            "999",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    _, _, env = install_mocks.write_instance_files.call_args.args
+    # explicit flag wins over the profile default
+    assert env.data["MAD_AGENT_TIMEOUT_S"] == "999"
+
+
+def test_install_unknown_profile_errors(
+    cli: CliRunner, install_mocks: SimpleNamespace, cli_config_dir: Path
+) -> None:
+    result = cli.invoke(
+        app,
+        [
+            "install",
+            "--yes",
+            "--name",
+            "web",
+            "--no-start",
+            "--profile",
+            "ghost",
+            "--github-token",
+            "ghp_x",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "not found" in result.output
+    install_mocks.write_instance_files.assert_not_called()
+
+
 def test_install_reconfigure_prefills_from_existing_env(
     cli: CliRunner,
     install_mocks: SimpleNamespace,
