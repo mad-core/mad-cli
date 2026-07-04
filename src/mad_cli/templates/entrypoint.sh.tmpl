@@ -1,0 +1,11 @@
+#!/bin/bash
+set -e
+
+# Authenticate the gh CLI with the token from the environment so that
+# `gh auth status` shows the account and every git operation (push, PR, …) works.
+if [[ -n "$${GITHUB_TOKEN:-}" ]]; then
+    echo "$$GITHUB_TOKEN" | gh auth login --with-token --hostname github.com 2>/dev/null || true
+    gh auth setup-git 2>/dev/null || true
+fi
+
+exec ${edge_entrypoint} serve --host 0.0.0.0 --port 8000

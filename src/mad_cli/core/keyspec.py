@@ -1,4 +1,11 @@
-"""Generic credential/API-key registry. Contract stub."""
+"""Registry of the credentials / API keys an operator can store in ``.env``.
+
+Each :class:`KeySpec` maps one logical secret to the environment variable(s) it
+is written to. Some secrets fan out to several variables that must carry the
+same value (``github`` -> ``GITHUB_TOKEN`` + ``GH_TOKEN``); ``claude-oauth`` is
+special-cased because, besides landing in ``.env``, it is materialised into the
+container's Claude credentials file (see :mod:`mad_cli.core.claude_creds`).
+"""
 
 from __future__ import annotations
 
@@ -15,8 +22,55 @@ class KeySpec:
     writes_claude_credentials: bool = False
 
 
-BUILTIN_KEYS: dict[str, KeySpec] = {}
+BUILTIN_KEYS: dict[str, KeySpec] = {
+    "claude-oauth": KeySpec(
+        id="claude-oauth",
+        env_vars=("_CLAUDE_OAUTH_TOKEN",),
+        prompt="Claude OAuth token (run `claude setup-token` on a logged-in machine)",
+        help_url="https://docs.anthropic.com/en/docs/claude-code",
+        writes_claude_credentials=True,
+    ),
+    "anthropic": KeySpec(
+        id="anthropic",
+        env_vars=("ANTHROPIC_API_KEY",),
+        prompt="Anthropic API key (sk-ant-…)",
+        help_url="https://console.anthropic.com/settings/keys",
+    ),
+    "github": KeySpec(
+        id="github",
+        env_vars=("GITHUB_TOKEN", "GH_TOKEN"),
+        prompt="GitHub personal access token (ghp_…)",
+        help_url="https://github.com/settings/tokens",
+    ),
+    "deepseek": KeySpec(
+        id="deepseek",
+        env_vars=("DEEPSEEK_API_KEY",),
+        prompt="DeepSeek API key",
+        help_url="https://platform.deepseek.com/api_keys",
+    ),
+    "linear": KeySpec(
+        id="linear",
+        env_vars=("LINEAR_API_KEY",),
+        prompt="Linear API key",
+        help_url="https://linear.app/settings/api",
+    ),
+    "opencode": KeySpec(
+        id="opencode",
+        env_vars=("OPENCODE_API_KEY",),
+        prompt="OpenCode API key",
+        help_url="https://opencode.ai/docs",
+    ),
+}
 
 
 def mask(value: str) -> str:
-    raise NotImplementedError
+    """Return a display-safe masking of ``value``.
+
+    Long secrets keep a short prefix and suffix (``"sk-a…f3"``); anything short
+    enough that a prefix/suffix would leak most of it is fully hidden.
+    """
+    if not value:
+        return ""
+    if len(value) <= 8:
+        return "…"
+    return f"{value[:4]}…{value[-2:]}"

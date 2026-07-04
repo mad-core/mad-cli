@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    # Path-gate the release trigger: bytes that never reach a PyPI consumer
+    # (docs, tests, CI workflows themselves, CLAUDE.md) must not move the
+    # version. See CLAUDE.md hard rule on package-centric versioning.
+    paths:
+      - "src/mad_cli/**"
+      - "pyproject.toml"
+      - "README.md"
+      - "LICENSE"
+  workflow_dispatch:
+    inputs:
+      manual_publish:
+        description: "Build current tree and publish to PyPI (skips semantic-release)"
+        type: boolean
+        default: false
+      release_kind:
+        description: "Bump kind for the semantic-release run (auto = derive from commits)"
+        type: choice
+        default: auto
+        options:
+          - auto
+          - minor
+          - major
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  manual-publish-pypi:
+    name: Manual publish to PyPI
+    if: github.event_name == 'workflow_dispatch' && inputs.manual_publish
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/mad-cli
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Build sdist + wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  release:
+    name: Semantic release
+    # Run on every push to `main` that touches a version-relevant path (above),
+    # and on `workflow_dispatch` whenever the operator did NOT pick the
+    # `manual_publish` escape hatch (that path goes through `manual-publish-pypi`).
+    if: |
+      github.event_name == 'push'
+      || (github.event_name == 'workflow_dispatch' && !inputs.manual_publish)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      released: ${{ steps.semrel.outputs.released }}
+      version: ${{ steps.semrel.outputs.version }}
+      tag: ${{ steps.semrel.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install package + dev deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+
+      - name: Run pytest
+        run: pytest -q
+
+      - name: Python semantic release
+        id: semrel
+        uses: python-semantic-release/python-semantic-release@v9
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # `release_kind` only exists on `workflow_dispatch`; on `push` the
+          # expression evaluates to '' and `force` is a no-op (auto behavior).
+          # `auto` is also mapped to '' so the operator can pick it explicitly.
+          force: >-
+            ${{ (github.event_name == 'workflow_dispatch' && inputs.release_kind != 'auto')
+                && inputs.release_kind || '' }}
+
+      - name: Upload dist artifacts
+        if: steps.semrel.outputs.released == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/mad-cli
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
