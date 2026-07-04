@@ -9,6 +9,7 @@ from mad_cli.commands import instances as instances_cmd
 from mad_cli.commands import keys as keys_cmd
 from mad_cli.commands import lifecycle as lifecycle_cmd
 from mad_cli.commands import profiles as profiles_cmd
+from mad_cli.commands import service as service_cmd
 from mad_cli.commands import versions as versions_cmd
 
 app = typer.Typer(
@@ -61,6 +62,10 @@ app.command("update")(versions_cmd.update)
 app.add_typer(keys_cmd.keys_app, name="keys")
 app.add_typer(config_cmd.config_app, name="config")
 app.add_typer(profiles_cmd.profiles_app, name="profiles")
+
+# ── service mode (HTTP API) ───────────────────────────────────────────────────
+app.command("serve")(service_cmd.serve)
+app.add_typer(service_cmd.service_app, name="service")
 
 
 def main() -> None:
