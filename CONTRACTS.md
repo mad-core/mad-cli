@@ -189,4 +189,118 @@ def main() -> None    # console-script entry point
 #   INSTANCE optional when exactly one instance exists (default_instance()).
 # commands.instances → `mad list`, `mad info NAME`
 # commands.profiles  → `mad profiles create|list|show|delete|apply` (add_typer name="profiles")
+# commands.service   → `mad serve`, `mad service install|uninstall|status|update`
+```
+
+## mad_cli.core.usecases (framework-free use-case layer, v0.4)
+
+The orchestration shared by the Typer commands and the FastAPI routes. Framework-free
+(no `typer`/`rich`/`fastapi`), `mypy --strict`. Single-instance operations take an
+already-resolved `Instance`; the adapter resolves it (mapping resolution failures to its
+own idiom) via `instances.resolve_instance`. Expected failures are raised as
+`errors.UseCaseError` subclasses.
+
+```python
+# usecases.errors
+class UseCaseError(Exception): ...
+class ValidationError(UseCaseError, ValueError): ...     # 400 / exit 1 (also a ValueError)
+class NotFoundError(UseCaseError): ...                    # 404 / exit 1
+class ConflictError(UseCaseError): ...                    # 409
+class AmbiguousInstanceError(UseCaseError): ...           # 409 / exit 1
+class PreconditionError(UseCaseError): ...                # 412 / exit 1
+def http_status_for(exc: UseCaseError) -> int
+
+# usecases.instances
+def resolve_instance(name: str | None) -> Instance   # NotFoundError / AmbiguousInstanceError
+def state_health(instance: Instance) -> tuple[str, str]        # best-effort (state, health)
+def list_instances() -> list[InstanceSummary]
+def instance_info(name: str) -> InstanceInfo                   # NotFoundError
+@dataclass(frozen=True) class InstanceSummary:  name, legacy, port, state, health, version
+@dataclass(frozen=True) class EnvItem:          key, value, secret; def display(*, reveal=False)
+@dataclass(frozen=True) class InstanceInfo:     name, legacy, config_dir, compose_file,
+#                                               data_path, port, version, env: list[EnvItem]
+
+# usecases.lifecycle  (each takes a resolved Instance)
+def start(instance: Instance) -> StartResult          # runner.up(build=True) + wait_healthy()
+def stop(instance: Instance) -> None
+def restart(instance: Instance) -> None
+def status(instance: Instance) -> StatusResult
+def instance_url(instance: Instance) -> str | None
+
+# usecases.configvals  (each takes a resolved Instance)
+COMPOSE_KEYS: tuple[str, ...]                          # MAD_HOST_PORT, MAD_DATA_PATH
+def list_config(instance: Instance) -> list[EnvItem]
+def get_config(instance: Instance, key: str) -> EnvItem                        # NotFoundError
+def set_config(instance: Instance, key: str, value: str) -> tuple[EnvItem, bool]  # ValidationError
+def unset_config(instance: Instance, key: str) -> bool                         # existed?
+
+# usecases.keys  (each takes a resolved Instance)
+CUSTOM_KEY_RE: re.Pattern                              # [A-Z][A-Z0-9_]*
+def key_prompt(key: str) -> tuple[str, bool]           # (prompt, secret); ValidationError
+def set_key(instance: Instance, key: str, value: str) -> SetKeyResult   # Validation/Precondition
+def list_keys(instance: Instance) -> KeysView
+def remove_key(instance: Instance, key: str) -> RemoveKeyResult
+
+# usecases.versions
+def versions(name: str | None) -> list[VersionRow]     # None = all; NotFoundError for a named miss
+def update(instance: Instance, version: str | None) -> UpdateResult
+
+# usecases.adopt
+def plan_adopt() -> AdoptPlan | None                   # None = no legacy layout; ValidationError
+def apply_adopt(plan: AdoptPlan) -> AdoptPlan
+
+# usecases.install
+@dataclass class InstallParams:  name port data_path timeout_s github_token puid pgid
+#   git_name git_email claude_token anthropic_api_key extra_env:{VAR:value}
+#   retention_days mcp_allowed_hosts edge_package edge_version start
+def validate_name/validate_port/validate_timeout/validate_retention(value: str) -> str
+def apply_extra_key(env: EnvFile, ident: str, value: str) -> list[str]   # fan out; ValidationError
+def build_env(params: InstallParams) -> tuple[EnvFile, list[str]]
+def install(params: InstallParams) -> InstallResult    # writes files+dirs+creds, optional start
+
+# usecases.service  (framework-free; never runs systemctl/launchctl)
+DEFAULT_HOST = "127.0.0.1"; DEFAULT_PORT = 7373
+def api_token_path() -> Path                           # config_root()/api-token
+def ensure_api_token() -> str                          # 0600, generated once
+def read_api_token() -> str | None
+def server_deps_available() -> bool                    # fastapi + uvicorn importable
+def server_venv_dir() -> Path; def server_venv_mad() -> Path; def server_venv_exists() -> bool
+def bootstrap_server_venv(*, wheel: Path | None = None) -> Path   # venv + pip install [server]
+def ensure_server_runtime(*, wheel: Path | None = None) -> tuple[list[str], bool]
+def serve_argv(launcher: list[str], host: str, port: int) -> list[str]
+def render_systemd_unit(*, exec_args, config_dir) -> str
+def render_launchd_plist(*, exec_args, config_dir, log_path) -> str
+def render_service(*, platform, exec_args, config_dir) -> RenderedService   # PreconditionError
+```
+
+## mad_cli.core.keyspec (added in v0.4)
+
+```python
+def is_secret_key(key: str) -> bool                    # masks TOKEN/KEY/SECRET/PASSWORD keys
+def display_value(key: str, value: str, *, reveal: bool = False) -> str
+```
+
+## mad_cli.server (the `server` optional extra, v0.4)
+
+Nothing here is imported by the base CLI; reached only via `mad serve` behind an import
+guard. Routes are thin adapters over `core.usecases`.
+
+```python
+def create_app() -> fastapi.FastAPI    # OpenAPI at /openapi.json
+
+# GET  /health                                   (no auth) -> {status, version}
+# Every /v1 route requires  Authorization: Bearer <config_root()/api-token>  (401 otherwise):
+# GET    /v1/instances                            list
+# POST   /v1/instances                            install (201; body = InstallRequest)
+# GET    /v1/instances/{name}                     info (env masked)
+# POST   /v1/instances/{name}/start|stop|restart  lifecycle (synchronous MVP)
+# GET    /v1/instances/{name}/status              container state + health
+# GET    /v1/instances/{name}/config              list (masked)
+# PUT    /v1/instances/{name}/config/{key}        set (body {value}); DELETE unset
+# GET    /v1/instances/{name}/keys                list (masked)
+# PUT    /v1/instances/{name}/keys/{key_id}       set (body {value}); DELETE remove
+# GET    /v1/instances/{name}/versions            version report
+# POST   /v1/instances/{name}/update              re-pin + rebuild (body {version})
+# POST   /v1/adopt                                migrate the legacy layout
+# Secret values are NEVER returned in clear (no reveal flag exists on the API).
 ```

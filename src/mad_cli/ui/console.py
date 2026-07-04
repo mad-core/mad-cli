@@ -12,6 +12,7 @@ from collections.abc import Callable
 from typing import TypeVar
 
 from rich.console import Console
+from rich.markup import escape
 
 _T = TypeVar("_T")
 
@@ -20,30 +21,35 @@ _T = TypeVar("_T")
 # redirect stdout (e.g. Typer's CliRunner) capture our output.
 console = Console()
 
+# The message argument to these helpers is plain text (paths, key names,
+# ``pip install 'mad-cli[server]'`` hints, ``[A-Z][A-Z0-9_]*`` patterns …), so it
+# is escaped before printing — only the status glyph carries markup. Otherwise
+# rich would silently swallow any ``[...]`` in the message as a style tag.
+
 
 def info(msg: str) -> None:
     """Neutral progress message."""
-    console.print(f"[cyan]▸[/cyan] {msg}", soft_wrap=True)
+    console.print(f"[cyan]▸[/cyan] {escape(msg)}", soft_wrap=True)
 
 
 def ok(msg: str) -> None:
     """Success message."""
-    console.print(f"[green]✓[/green] {msg}", soft_wrap=True)
+    console.print(f"[green]✓[/green] {escape(msg)}", soft_wrap=True)
 
 
 def warn(msg: str) -> None:
     """Non-fatal warning."""
-    console.print(f"[yellow]![/yellow] {msg}", soft_wrap=True)
+    console.print(f"[yellow]![/yellow] {escape(msg)}", soft_wrap=True)
 
 
 def error(msg: str) -> None:
     """Error message. Rendering only — callers decide whether to exit."""
-    console.print(f"[red]✗[/red] {msg}", soft_wrap=True)
+    console.print(f"[red]✗[/red] {escape(msg)}", soft_wrap=True)
 
 
 def header(msg: str) -> None:
     """Bold section header, preceded by a blank line."""
-    console.print(f"\n[bold]{msg}[/bold]", soft_wrap=True)
+    console.print(f"\n[bold]{escape(msg)}[/bold]", soft_wrap=True)
 
 
 def run_step(message: str, func: Callable[[], _T]) -> _T:

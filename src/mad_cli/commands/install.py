@@ -1,15 +1,14 @@
 """``mad install`` — guided install / reconfiguration of a mad-edge instance.
 
-This is an English port of ``mad/scripts/configure.sh``: it checks Docker,
-collects the same parameters (each with a CLI flag that skips its prompt),
-renders the instance files through ``mad_cli.core`` and optionally starts the
-container. Re-running against an existing instance pre-fills values from its
-``.env`` (idempotent reconfiguration).
+Thin adapter over :func:`mad_cli.core.usecases.install.install`: this module owns
+the interactive collection (each parameter has a flag that skips its prompt),
+the Docker preflight, and the masked summary; the use case owns assembling the
+``.env``, rendering the files, creating the data dirs and writing the Claude
+credentials. Re-running against an existing instance pre-fills from its ``.env``.
 """
 
 import os
 import platform
-import re
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -18,15 +17,22 @@ import typer
 from rich.panel import Panel
 from rich.table import Table
 
-from mad_cli.core.claude_creds import write_claude_credentials
-from mad_cli.core.compose import ComposeRunner
 from mad_cli.core.docker_check import check_docker, install_docker_linux
 from mad_cli.core.envfile import EnvFile
 from mad_cli.core.instance import Instance, InstanceNotFoundError, get_instance
 from mad_cli.core.keyspec import BUILTIN_KEYS, mask
-from mad_cli.core.paths import instance_dir
 from mad_cli.core.profiles import ProfileNotFoundError, load_profile
-from mad_cli.core.templates import EDGE_PACKAGE, RenderContext, write_instance_files
+from mad_cli.core.templates import EDGE_PACKAGE
+from mad_cli.core.usecases import install as uc
+from mad_cli.core.usecases import lifecycle as uc_lifecycle
+from mad_cli.core.usecases.errors import UseCaseError
+from mad_cli.core.usecases.install import (
+    InstallParams,
+    validate_name,
+    validate_port,
+    validate_retention,
+    validate_timeout,
+)
 from mad_cli.ui.console import console, error, header, info, ok, run_step, warn
 from mad_cli.ui.prompts import PromptRequiredError, ask, confirm
 
@@ -43,12 +49,6 @@ class _KeyError(Exception):
     """An ``--set-key`` / extra-key entry could not be applied (bad id or value)."""
 
 
-_NAME_RE = re.compile(r"[a-z0-9][a-z0-9-]*")
-
-# A custom key is written verbatim; it must look like a shell env-var name
-# (matches ``mad keys set``).
-_CUSTOM_KEY_RE = re.compile(r"[A-Z][A-Z0-9_]*")
-
 # Module-level singleton for the repeatable --set-key option (a mutable-typed
 # default may not be an inline call — see flake8-bugbear B008).
 _SET_KEY_OPTION = typer.Option(
@@ -62,54 +62,6 @@ _SET_KEY_OPTION = typer.Option(
 )
 
 
-def _validate_name(value: str) -> str:
-    value = value.strip()
-    if not _NAME_RE.fullmatch(value):
-        raise ValueError(
-            f"invalid instance name {value!r}: use lowercase letters, digits and "
-            "hyphens, starting with a letter or digit"
-        )
-    return value
-
-
-def _validate_port(value: str) -> str:
-    try:
-        port = int(value)
-    except ValueError:
-        raise ValueError(f"invalid port {value!r}: must be an integer") from None
-    if not 1 <= port <= 65535:
-        raise ValueError(f"invalid port {value!r}: must be between 1 and 65535")
-    return str(port)
-
-
-def _validate_timeout(value: str) -> str:
-    try:
-        seconds = int(value)
-    except ValueError:
-        raise ValueError(
-            f"invalid timeout {value!r}: must be an integer number of seconds"
-        ) from None
-    if seconds <= 0:
-        raise ValueError(f"invalid timeout {value!r}: must be a positive integer")
-    return str(seconds)
-
-
-def _validate_retention(value: str) -> str:
-    """A session-log retention: a positive integer number of days, or empty."""
-    value = value.strip()
-    if not value:
-        return ""
-    try:
-        days = int(value)
-    except ValueError:
-        raise ValueError(
-            f"invalid retention {value!r}: must be a positive integer of days, or empty"
-        ) from None
-    if days < 1:
-        raise ValueError(f"invalid retention {value!r}: must be >= 1 (or empty to keep forever)")
-    return str(days)
-
-
 def _split_set_key(item: str) -> tuple[str, str]:
     """Split an ``ID=VALUE`` --set-key entry, or raise :class:`_KeyError`."""
     ident, sep, value = item.partition("=")
@@ -119,32 +71,23 @@ def _split_set_key(item: str) -> tuple[str, str]:
 
 
 def _apply_key(env: EnvFile, ident: str, value: str, applied: list[str]) -> None:
-    """Write a builtin (fanned out) or custom key into ``env``.
+    """Write a builtin (fanned out) or custom key into ``env`` (a scratch overlay).
 
-    Appends every env var it touched to ``applied`` (for the summary). Rejects
-    ``claude-oauth`` — it has its own ``--claude-token`` flag because it also
-    materialises the container credentials file. Raises :class:`_KeyError` on a
-    bad id so the caller decides whether to abort (flags) or re-prompt (loop).
+    Appends every env var it touched to ``applied``. Rejects ``claude-oauth`` — it
+    has its own ``--claude-token`` flag because it also materialises the container
+    credentials file — and raises :class:`_KeyError` on a bad id so the caller
+    decides whether to abort (flags) or re-prompt (loop).
     """
     spec = BUILTIN_KEYS.get(ident)
-    if spec is not None:
-        if spec.writes_claude_credentials:
-            raise _KeyError(
-                f"{ident!r} cannot be set with --set-key; use --claude-token "
-                "(it also writes the container credentials file)."
-            )
-        for var in spec.env_vars:
-            env.set(var, value)
-            applied.append(var)
-        return
-    if _CUSTOM_KEY_RE.fullmatch(ident):
-        env.set(ident, value)
-        applied.append(ident)
-        return
-    raise _KeyError(
-        f"unknown key {ident!r}: use a builtin id ({', '.join(BUILTIN_KEYS)}) "
-        "or an env-var name matching [A-Z][A-Z0-9_]*."
-    )
+    if spec is not None and spec.writes_claude_credentials:
+        raise _KeyError(
+            f"{ident!r} cannot be set with --set-key; use --claude-token "
+            "(it also writes the container credentials file)."
+        )
+    try:
+        applied.extend(uc.apply_extra_key(env, ident, value))
+    except UseCaseError as exc:
+        raise _KeyError(str(exc)) from exc
 
 
 def _prompt_extra_keys(env: EnvFile, applied: list[str]) -> None:
@@ -242,27 +185,19 @@ def _ensure_docker(*, assume_yes: bool) -> None:
     ok(f"Docker ready — {status.version}" if status.version else "Docker ready")
 
 
-def _print_summary(
-    *,
-    env: EnvFile,
-    name: str,
-    port: int,
-    data_dir: Path,
-    timeout: int,
-    config_dir: Path,
-    extra_key_vars: list[str],
-) -> None:
+def _print_summary(result: uc.InstallResult, *, extra_key_vars: list[str]) -> None:
+    env = result.env
     table = Table(show_header=False, box=None, pad_edge=False)
     table.add_column("key", style="bold cyan", no_wrap=True)
     table.add_column("value")
-    table.add_row("Instance", name)
-    table.add_row("Port", str(port))
-    table.add_row("Data path", str(data_dir))
-    table.add_row("Sessions", str(data_dir / name / "sessions"))
-    table.add_row("Timeout", f"{timeout}s")
+    table.add_row("Instance", result.name)
+    table.add_row("Port", str(result.port))
+    table.add_row("Data path", str(result.data_dir))
+    table.add_row("Sessions", str(result.data_dir / result.name / "sessions"))
+    table.add_row("Timeout", f"{result.timeout_s}s")
     retention = env.get("MAD_SESSIONS_RETENTION_DAYS")
     table.add_row("Session retention", f"{retention} days" if retention else "keep forever")
-    table.add_row("Config dir", str(config_dir))
+    table.add_row("Config dir", str(result.config_dir))
 
     shown: set[str] = set()
     for key in ("GITHUB_TOKEN", "_CLAUDE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"):
@@ -356,7 +291,7 @@ def install(
             flag_name="--name",
             prompt="Instance name",
             default="default",
-            validator=_validate_name,
+            validator=validate_name,
         )
 
         existing: Instance | None
@@ -400,7 +335,7 @@ def install(
             flag_name="--port",
             prompt="Host port",
             default=prior("MAD_HOST_PORT", "8080"),
-            validator=_validate_port,
+            validator=validate_port,
         )
         data_value = _collect(
             interactive=interactive,
@@ -415,7 +350,7 @@ def install(
             flag_name="--timeout",
             prompt="Agent timeout (seconds)",
             default=prior("MAD_AGENT_TIMEOUT_S", "600"),
-            validator=_validate_timeout,
+            validator=validate_timeout,
         )
         retention_value = _collect(
             interactive=interactive,
@@ -423,7 +358,7 @@ def install(
             flag_name="--retention-days",
             prompt="Session log retention in days (empty = keep forever)",
             default=prior("MAD_SESSIONS_RETENTION_DAYS", ""),
-            validator=_validate_retention,
+            validator=validate_retention,
         )
         github_value = _collect(
             interactive=interactive,
@@ -505,113 +440,65 @@ def install(
     if not claude_value:
         warn("No Claude token set — the container starts but agents cannot authenticate.")
 
-    data_dir = Path(data_value).expanduser()
-    port_int = int(port_value)
-    timeout_int = int(timeout_value)
-    puid = _host_id("getuid")
-    pgid = _host_id("getgid")
-
-    env = EnvFile.empty()
-    env.set("MAD_INSTANCE", name_value)
-    env.set("MAD_HOST_PORT", port_value)
-    env.set("MAD_VERSION", edge_version_value)
-    env.set("PUID", str(puid))
-    env.set("PGID", str(pgid))
-    env.set("MAD_DATA_PATH", str(data_dir))
-    env.set("GITHUB_TOKEN", github_value)
-    env.set("GH_TOKEN", github_value)
-    env.set("GIT_AUTHOR_NAME", git_name_value)
-    env.set("GIT_AUTHOR_EMAIL", git_email_value)
-    env.set("GIT_COMMITTER_NAME", git_name_value)
-    env.set("GIT_COMMITTER_EMAIL", git_email_value)
-    env.set("MAD_AGENT_TIMEOUT_S", timeout_value)
-    env.set("_CLAUDE_OAUTH_TOKEN", claude_value)
-    if anthropic_value:
-        env.set("ANTHROPIC_API_KEY", anthropic_value)
-
     # Extra API keys: --set-key flags first (abort on a bad entry), then the
-    # interactive mini-loop (re-prompts on a bad entry instead of aborting).
+    # interactive mini-loop (re-prompts on a bad entry). Collected into a scratch
+    # env overlay (builtins fanned out), then flattened to {VAR: value}.
+    scratch = EnvFile.empty()
     extra_key_vars: list[str] = []
     try:
         for item in set_key or []:
             ident, value = _split_set_key(item)
-            _apply_key(env, ident, value, extra_key_vars)
+            _apply_key(scratch, ident, value, extra_key_vars)
     except _KeyError as exc:
         error(str(exc))
         raise typer.Exit(1) from exc
     if interactive:
-        _prompt_extra_keys(env, extra_key_vars)
+        _prompt_extra_keys(scratch, extra_key_vars)
+    extra_env = {var: scratch.get(var) or "" for var in scratch.keys()}  # noqa: SIM118
 
-    # Session-log retention: a value activates it; otherwise leave a documented,
-    # inactive reference so the operator knows the knob exists (keep forever).
-    if retention_value:
-        env.set("MAD_SESSIONS_RETENTION_DAYS", retention_value)
-    else:
-        env.add_comment(
-            "MAD_SESSIONS_RETENTION_DAYS=  # session log retention in days; unset = keep forever"
-        )
-
-    # MCP DNS-rebinding protection: commented reference when left disabled.
-    if mcp_hosts_value:
-        env.set("MAD_MCP_ALLOWED_HOSTS", mcp_hosts_value)
-    else:
-        env.add_comment(
-            "MAD_MCP_ALLOWED_HOSTS=  # comma-separated allowed hosts; unset = protection disabled"
-        )
-
-    # SSE keep-alive heartbeat is never prompted — leave it as a reference knob.
-    if env.get("MAD_SSE_HEARTBEAT_S") is None:
-        env.add_comment("MAD_SSE_HEARTBEAT_S=  # SSE keep-alive heartbeat in seconds")
-
-    ctx = RenderContext(
-        instance=name_value,
-        host_port=port_int,
-        data_path=data_dir,
-        timeout_s=timeout_int,
-        puid=puid,
-        pgid=pgid,
+    params = InstallParams(
+        name=name_value,
+        port=int(port_value),
+        data_path=Path(data_value).expanduser(),
+        timeout_s=int(timeout_value),
+        github_token=github_value,
+        puid=_host_id("getuid"),
+        pgid=_host_id("getgid"),
+        git_name=git_name_value,
+        git_email=git_email_value,
+        claude_token=claude_value,
+        anthropic_api_key=anthropic_value,
+        extra_env=extra_env,
+        retention_days=retention_value,
+        mcp_allowed_hosts=mcp_hosts_value or "",
         edge_package=edge_package_value,
         edge_version=edge_version_value,
+        start=False,  # the CLI starts separately below (so the summary prints first)
     )
 
-    config_dir = instance_dir(name_value)
     header("Writing configuration")
-    write_instance_files(config_dir, ctx, env)
-    ok(f"Instance files → {config_dir}")
-
-    instance_data = data_dir / name_value
-    (instance_data / "workspaces").mkdir(parents=True, exist_ok=True)
-    (instance_data / "sessions").mkdir(parents=True, exist_ok=True)
-    (instance_data / "aws").mkdir(parents=True, exist_ok=True)
-    claude_dir = instance_data / "claude"
-    if claude_value:
-        creds = write_claude_credentials(claude_dir, claude_value)
-        ok(f"Claude credentials → {creds}")
+    try:
+        result = uc.install(params)
+    except UseCaseError as exc:
+        error(str(exc))
+        raise typer.Exit(1) from exc
+    ok(f"Instance files → {result.config_dir}")
+    if result.claude_credentials_path is not None:
+        ok(f"Claude credentials → {result.claude_credentials_path}")
     else:
-        claude_dir.mkdir(parents=True, exist_ok=True)
-        warn(f"Claude credentials directory left empty: {claude_dir}")
+        warn(f"Claude credentials directory left empty: {result.claude_dir}")
 
-    _print_summary(
-        env=env,
-        name=name_value,
-        port=port_int,
-        data_dir=data_dir,
-        timeout=timeout_int,
-        config_dir=config_dir,
-        extra_key_vars=extra_key_vars,
-    )
+    _print_summary(result, extra_key_vars=extra_key_vars)
 
     if no_start:
         hint = "mad start" if name_value == "default" else f"mad start {name_value}"
         info(f"Configuration written. Start the container later with `{hint}` (--no-start).")
         return
 
-    instance = Instance(name=name_value, config_dir=config_dir, env=env)
-    runner = ComposeRunner(instance)
+    instance = Instance(name=result.name, config_dir=result.config_dir, env=result.env)
     header("Starting mad-edge")
-    run_step("Building and starting the container…", lambda: runner.up(build=True))
-    healthy = run_step("Waiting for the container to become healthy…", runner.wait_healthy)
-    if healthy:
-        ok(f"Mad is up — API/MCP on http://localhost:{port_int}")
+    res = run_step("Building and starting the container…", lambda: uc_lifecycle.start(instance))
+    if res.healthy:
+        ok(f"Mad is up — API/MCP on {res.url}" if res.url else "Mad is up.")
     else:
         warn("Container started but is not healthy yet. Check `mad status` and `mad logs`.")

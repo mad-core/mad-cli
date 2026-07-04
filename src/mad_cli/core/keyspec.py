@@ -74,3 +74,25 @@ def mask(value: str) -> str:
     if len(value) <= 8:
         return "…"
     return f"{value[:4]}…{value[-2:]}"
+
+
+# Substrings that mark an env key as holding a secret whose value must be masked
+# before it is shown to a human or returned over the API.
+_SECRET_HINTS = ("TOKEN", "KEY", "SECRET", "PASSWORD")
+
+
+def is_secret_key(key: str) -> bool:
+    """True if ``key`` looks like it holds a credential (masked on display)."""
+    upper = key.upper()
+    return any(hint in upper for hint in _SECRET_HINTS)
+
+
+def display_value(key: str, value: str, *, reveal: bool = False) -> str:
+    """Return ``value`` for display: masked when it looks secret, else verbatim.
+
+    ``reveal=True`` returns the raw value (the CLI ``--reveal`` path); the HTTP
+    API never passes it, so secret-looking values are always masked there.
+    """
+    if reveal or not value or not is_secret_key(key):
+        return value
+    return mask(value)

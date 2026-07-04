@@ -13,7 +13,7 @@ from mad_cli.core.instance import InstanceNotFoundError
 
 
 def test_list_empty_hints_install(cli: CliRunner, monkeypatch: pytest.MonkeyPatch) -> None:
-    from mad_cli.commands import instances as mod
+    from mad_cli.core.usecases import instances as mod
 
     monkeypatch.setattr(mod, "discover_instances", lambda: [])
     result = cli.invoke(app, ["list"])
@@ -24,7 +24,7 @@ def test_list_empty_hints_install(cli: CliRunner, monkeypatch: pytest.MonkeyPatc
 def test_list_renders_both_instances(
     cli: CliRunner, make_instance, make_env, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from mad_cli.commands import instances as mod
+    from mad_cli.core.usecases import instances as mod
 
     web = make_instance(name="web", host_port=9000, env=make_env({"MAD_VERSION": "0.6.0"}))
     api = make_instance(name="api", host_port=9100, legacy=True)
@@ -65,7 +65,10 @@ def test_info_masks_secret_env_values(
         compose_file=Path("/cfg/web/compose.yml"),
         data_path=Path("/data/web"),
     )
-    monkeypatch.setattr(mod, "get_instance", lambda name: inst)
+    # instance_info resolves via the use case; masking is applied by the command.
+    from mad_cli.core.usecases import instances as uc_mod
+
+    monkeypatch.setattr(uc_mod, "get_instance", lambda name: inst)
     monkeypatch.setattr(mod, "mask", lambda value: "sk-masked-xx")
 
     result = cli.invoke(app, ["info", "web"])
@@ -78,7 +81,7 @@ def test_info_masks_secret_env_values(
 
 
 def test_info_unknown_instance_errors(cli: CliRunner, monkeypatch: pytest.MonkeyPatch) -> None:
-    from mad_cli.commands import instances as mod
+    from mad_cli.core.usecases import instances as mod
 
     def _raise(name: str):
         raise InstanceNotFoundError(name)
