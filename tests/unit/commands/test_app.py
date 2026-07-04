@@ -11,8 +11,8 @@ from mad_cli.app import app
 def test_version_prints_package_version(cli: CliRunner) -> None:
     result = cli.invoke(app, ["--version"])
     assert result.exit_code == 0
-    assert __version__ in result.output
-    assert __version__ == "0.1.0"
+    # --version prints exactly the package version (kept in lock-step by release automation).
+    assert result.output.strip() == __version__
 
 
 def test_no_args_shows_help(cli: CliRunner) -> None:
