@@ -42,8 +42,10 @@ ARG PGID=${pgid}
 RUN set -eux; \
     userdel -r node 2>/dev/null || true; \
     groupdel node 2>/dev/null || true; \
-    groupadd -g "$${PGID}" mad; \
-    useradd -u "$${PUID}" -g "$${PGID}" -m -d /home/mad -s /bin/bash mad; \
+    # The host GID may already exist in the base image (e.g. macOS gid 20 is
+    # Debian's dialout); reuse it instead of failing, and allow a duplicate UID.
+    getent group "$${PGID}" >/dev/null || groupadd -g "$${PGID}" mad; \
+    useradd -o -u "$${PUID}" -g "$${PGID}" -m -d /home/mad -s /bin/bash mad; \
     mkdir -p /workspaces /home/mad/.claude /home/mad/.aws; \
     chown -R "$${PUID}:$${PGID}" /workspaces /home/mad
 
