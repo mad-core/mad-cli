@@ -40,7 +40,11 @@ Run the guided installer:
 mad install
 ```
 
-This renders the instance files under `~/.config/mad/instances/<name>/` (or under `$MAD_CLI_CONFIG_DIR`), creates the data directories, and — unless `--no-start` is passed — builds and starts the container.
+This renders the instance files under `~/.config/mad/instances/<name>/` (or under `$MAD_CLI_CONFIG_DIR`), creates the per-instance data directories (`workspaces/`, `sessions/`, `aws/`, `claude/` under `<data_path>/<instance>/`), and — unless `--no-start` is passed — builds and starts the container.
+
+The `sessions/` directory is bind-mounted to `/sessions` in the container and pinned there via `MAD_SESSIONS_DIR`, so mad-edge's JSONL session logs (its source of truth) live on the host and survive a rebuild (`mad update`). Existing instances created before this change should re-run `mad install` (idempotent) to adopt the mount.
+
+`mad install` can optionally collect a few extra mad-edge settings up front so you do not need follow-up `mad config set` calls: an alternative `--anthropic-api-key`, additional registry/custom keys via repeatable `--set-key ID=VALUE`, session-log retention via `--retention-days`, and MCP allowed hosts via `--mcp-allowed-hosts`. Omitted knobs are left as commented references in the `.env`.
 
 Use `--yes` to run it non-interactively.
 

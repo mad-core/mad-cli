@@ -37,12 +37,16 @@ Each option is optional, and supplying its flag skips the matching interactive p
 | `--git-name` | — | Git author name. |
 | `--git-email` | — | Git author email. |
 | `--claude-token` | — | Claude OAuth token; run `claude setup-token`. |
+| `--anthropic-api-key` | — | Anthropic API key (secret, optional — alternative billing to the Claude OAuth token). Prompted right after the Claude token. Writes `ANTHROPIC_API_KEY`. |
+| `--set-key ID=VALUE` | — (repeatable) | Extra API key. `ID` is a builtin registry id (fanned out to its env vars) or a custom `[A-Z][A-Z0-9_]*` VAR name (written verbatim). `claude-oauth` is rejected here — it has its own `--claude-token`. In interactive mode a mini-loop offers the same after the main credentials. |
+| `--retention-days` | — (omit = keep forever) | Session-log retention in days (integer ≥ 1). When given, writes `MAD_SESSIONS_RETENTION_DAYS`; otherwise it is left as a commented reference. |
+| `--mcp-allowed-hosts` | — (blank = disabled) | Comma-separated MCP allowed hosts for DNS-rebinding protection. When given, writes `MAD_MCP_ALLOWED_HOSTS`; otherwise left as a commented reference. |
 | `--edge-package` | (hidden) | Override the mad-edge package name. |
 | `--edge-version` | — (blank = latest) | Pin mad-edge. |
 | `--yes` / `-y` | — | Non-interactive: use flags + defaults, never prompt. |
 | `--no-start` | — | Write config but don't start. |
 
-Behaviour: Docker preflight (offers to install on Linux, an actionable error elsewhere); writes the instance files under the config dir; creates the data dirs (`workspaces/`, `aws/`, `claude/`); writes Claude credentials if a token was given; prints a masked summary; and unless `--no-start`, builds, starts, and waits for health. In `--yes` / non-TTY mode a missing required value (for example `--github-token`) exits 1 naming the flag.
+Behaviour: Docker preflight (offers to install on Linux, an actionable error elsewhere); writes the instance files under the config dir; creates the data dirs (`workspaces/`, `sessions/`, `aws/`, `claude/`); writes Claude credentials if a token was given; leaves commented references for the un-prompted `.env` knobs (`MAD_SESSIONS_RETENTION_DAYS`, `MAD_MCP_ALLOWED_HOSTS`, `MAD_SSE_HEARTBEAT_S`) when they are not set; prints a masked summary (instance, port, data path, sessions path, timeout, session retention, extra keys, MCP hosts); and unless `--no-start`, builds, starts, and waits for health. In `--yes` / non-TTY mode a missing required value (for example `--github-token`) exits 1 naming the flag.
 
 ## Lifecycle
 
