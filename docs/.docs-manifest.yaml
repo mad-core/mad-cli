@@ -161,7 +161,7 @@ docs:
     when the core<->surface layering rule (CLAUDE.md hard rule 3 / CONTRACTS.md)
     changes. Renames within an existing module are captured by source-tree.md and
     do NOT need a rewrite.
-  acknowledged_at_commit: 4499532034431e6f0a16846041a0324f2d96600e
+  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
 - path: docs/02-architecture/source-tree.md
   section: architecture
   kind: deterministic
@@ -239,7 +239,7 @@ docs:
     lifecycle start|stop|restart|status|logs|shell, inventory list|info|adopt,
     versions|update, keys set|list|remove, config get|set|unset) in sync with the
     registration order in `app.py`.
-  acknowledged_at_commit: 4499532034431e6f0a16846041a0324f2d96600e
+  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
 - path: docs/03-contracts/external-dependencies.md
   section: contracts
   kind: heuristic
@@ -270,7 +270,7 @@ docs:
     PyPI JSON endpoint or fail-soft behaviour in `pypi.py` changes, or when a
     `*.tmpl` under `templates/` changes what is installed inside the container
     (base image, agent CLIs, the mad-edge package/entrypoint).
-  acknowledged_at_commit: 4499532034431e6f0a16846041a0324f2d96600e
+  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
 
 # ---- 04 conventions -----------------------------------------------------
 - path: docs/04-conventions/cli-design.md
@@ -302,7 +302,7 @@ docs:
     contract in `ui/prompts.py` (`PromptRequiredError`, non-TTY behaviour)
     changes, or when the masking rule (`commands/_common.is_secret_key`,
     `core/keyspec.mask`) changes.
-  acknowledged_at_commit: 4499532034431e6f0a16846041a0324f2d96600e
+  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
 - path: docs/04-conventions/layering.md
   section: conventions
   kind: heuristic
@@ -334,7 +334,7 @@ docs:
     `commands/`/`ui/` module starts touching `subprocess`/the filesystem
     directly, or when the mypy-strict scope (`[[tool.mypy.overrides]]` on
     `mad_cli.core.*`) changes.
-  acknowledged_at_commit: 4499532034431e6f0a16846041a0324f2d96600e
+  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
 - path: docs/04-conventions/quality.md
   section: conventions
   kind: heuristic
@@ -360,7 +360,7 @@ docs:
     (timeout, markers, addopts) or the dev dependency set in pyproject.toml
     change, or when the `quality`/`test`/`audit` jobs in `ci.yml` change what
     they enforce.
-  acknowledged_at_commit: 4499532034431e6f0a16846041a0324f2d96600e
+  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
 - path: docs/04-conventions/testing-strategy.md
   section: conventions
   kind: heuristic
@@ -388,7 +388,7 @@ docs:
     `--cov-fail-under` threshold in `ci.yml` changes, or when the mocking
     convention (mock `mad_cli.core`, real-core fixtures like
     `make_real_instance`) changes.
-  acknowledged_at_commit: 4499532034431e6f0a16846041a0324f2d96600e
+  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
 
 # ---- 05 operations ------------------------------------------------------
 - path: docs/05-operations/installation.md
@@ -417,7 +417,7 @@ docs:
     (`requires-python`, the `mad` console script, dependencies), when the README
     quickstart changes, or when `commands/install.py` changes the guided-install
     flow (Docker preflight, the collected parameters, `--no-start`).
-  acknowledged_at_commit: 4499532034431e6f0a16846041a0324f2d96600e
+  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
 - path: docs/05-operations/configuration.md
   section: operations
   kind: heuristic
@@ -447,7 +447,7 @@ docs:
     or compose-baked-key set in `config.py` change, or when a `KeySpec` is
     added/removed in `keyspec.BUILTIN_KEYS`. This doc is the authoritative key
     inventory; keep secrets masked and never print a value.
-  acknowledged_at_commit: 4499532034431e6f0a16846041a0324f2d96600e
+  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
 - path: docs/05-operations/ci-cd.md
   section: operations
   kind: heuristic
@@ -510,7 +510,7 @@ docs:
     when the path-gate or `release_kind`/`manual_publish` inputs in `release.yml`
     change, or when `testpypi-preview.yml` changes its build/publish/verify jobs
     or the `TESTPYPI_ENABLED` gate. Cross-reference CLAUDE.md hard rules 2 and 6.
-  acknowledged_at_commit: 4499532034431e6f0a16846041a0324f2d96600e
+  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0
 
 # ---- 06 history ---------------------------------------------------------
 # `changelog` is heuristic, sourced from the semantic-release CHANGELOG.md at the
@@ -538,4 +538,4 @@ docs:
     ...), use the exact commit links from the source, and carry the four-field
     frontmatter. Do not invent entries — this doc only reflects what
     semantic-release has already cut.
-  acknowledged_at_commit: 4499532034431e6f0a16846041a0324f2d96600e
+  acknowledged_at_commit: bd1131b18aa04db77b77343ad01f0ee7bfff68a0

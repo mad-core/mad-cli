@@ -13,26 +13,33 @@ Tree of `tests/` reconstructed from git-tracked files only. Same CI re-run + dif
 
 ```
 tests/
-└── unit/
-    ├── commands/
-    │   ├── conftest.py
-    │   ├── test_app.py
-    │   ├── test_config.py
-    │   ├── test_install.py
-    │   ├── test_instances.py
-    │   ├── test_keys.py
-    │   ├── test_lifecycle.py
-    │   └── test_versions.py
-    ├── core/
-    │   ├── test_claude_creds.py
-    │   ├── test_compose.py
-    │   ├── test_docker_check.py
-    │   ├── test_envfile.py
-    │   ├── test_instance.py
-    │   ├── test_keyspec.py
-    │   ├── test_paths.py
-    │   ├── test_pypi.py
-    │   └── test_templates.py
-    └── ui/
-        └── test_prompts.py
+├── unit/
+│   ├── commands/
+│   │   ├── __init__.py
+│   │   ├── conftest.py
+│   │   ├── test_app.py
+│   │   ├── test_config.py
+│   │   ├── test_install.py
+│   │   ├── test_instances.py
+│   │   ├── test_keys.py
+│   │   ├── test_lifecycle.py
+│   │   ├── test_profiles.py
+│   │   └── test_versions.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── test_claude_creds.py
+│   │   ├── test_compose.py
+│   │   ├── test_docker_check.py
+│   │   ├── test_envfile.py
+│   │   ├── test_instance.py
+│   │   ├── test_keyspec.py
+│   │   ├── test_paths.py
+│   │   ├── test_profiles.py
+│   │   ├── test_pypi.py
+│   │   └── test_templates.py
+│   ├── ui/
+│   │   ├── __init__.py
+│   │   └── test_prompts.py
+│   └── __init__.py
+└── __init__.py
 ```

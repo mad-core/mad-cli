@@ -48,7 +48,7 @@ Every display of a credential is masked:
   for short values.
 - `commands/_common.is_secret_key(key)` treats a key as secret when its name
   contains `TOKEN`, `KEY`, `SECRET` or `PASSWORD`.
-- `config get` masks unless `--reveal` is passed.
+- `config get` and `profiles show` mask unless `--reveal` is passed.
 - `keys list`, `keys info` and the install summary always mask.
 
 ## Output helpers
@@ -61,5 +61,5 @@ decide whether to exit.
 
 ## Restart hint
 
-Mutating commands (keys, config) end with a hint:
+Mutating commands (keys, config, `profiles apply`) end with a hint:
 `Restart the instance to apply: mad restart <name>`.

@@ -43,10 +43,15 @@ These are the keys mad-cli writes and manages in `~/.config/mad/instances/<name>
 | `LINEAR_API_KEY` | Registry credential (linear), set via `mad install --set-key linear=…` or `mad keys set`. | Yes |
 | `OPENCODE_API_KEY` | Registry credential (opencode), set via `mad install --set-key opencode=…` or `mad keys set`. | Yes |
 
+## Profiles (reusable `.env` value sets)
+
+A *profile* is a named, reusable set of these keys — **credentials and tuning, never instance identity** — stored one file per profile at `~/.config/mad/profiles/<name>.env` (or under `$MAD_CLI_CONFIG_DIR/profiles/`), `chmod 600`. The instance-identity keys (`MAD_INSTANCE`, `MAD_HOST_PORT`, `PUID`, `PGID`, `MAD_DATA_PATH`, `MAD_VERSION`) are excluded when a profile is seeded from an instance, so a profile can be stamped across many instances. Manage them with `mad profiles create|list|show|delete|apply`; `mad install --profile NAME` feeds a profile's values as the wizard defaults (explicit flag > profile > built-in default).
+
 ## Editing
 
 - `mad config get|set|unset` — general-purpose `.env` editor.
 - `mad keys set|list|remove` — credential-aware editor.
+- `mad profiles apply NAME INSTANCE` — overlay a whole profile onto an instance's `.env`.
 
 Notes on behaviour:
 

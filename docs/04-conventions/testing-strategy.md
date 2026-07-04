@@ -23,8 +23,8 @@ a plain `pytest -q` passes on a machine with no Docker daemon.
 
 Command tests mock `mad_cli.core` throughout, so any un-mocked core call fails
 loudly. A `make_real_instance` fixture writes `instances/<name>/.env` under a
-scratch `MAD_CLI_CONFIG_DIR` to exercise the unmocked engine end-to-end for keys
-and config.
+scratch `MAD_CLI_CONFIG_DIR` to exercise the unmocked engine end-to-end for keys,
+config and profiles.
 
 ## Compose dry run
 
@@ -38,8 +38,8 @@ per-test timeout is 15s.
 
 ## Test modules present
 
-- `tests/unit/core/test_{claude_creds,compose,docker_check,envfile,instance,keyspec,paths,pypi,templates}.py`
-- `tests/unit/commands/test_{app,config,install,instances,keys,lifecycle,versions}.py`
+- `tests/unit/core/test_{claude_creds,compose,docker_check,envfile,instance,keyspec,paths,profiles,pypi,templates}.py`
+- `tests/unit/commands/test_{app,config,install,instances,keys,lifecycle,profiles,versions}.py`
   (plus `conftest.py`)
 - `tests/unit/ui/test_prompts.py`
 
