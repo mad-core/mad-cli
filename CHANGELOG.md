@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v0.3.1 (2026-07-04)
+
+### Bug Fixes
+
+- **templates**: Tolerate host UID/GID collisions when creating the container user
+  ([`cc4a022`](https://github.com/mad-core/mad-cli/commit/cc4a0221a462cf2b1627f35e3cdf7a00a7a491e1))
+
+groupadd -g "${PGID}" fails with exit 4 when the host GID already exists in the base image — e.g.
+  macOS operators have gid 20, which is Debian's dialout group. Reuse an existing group and allow a
+  duplicate UID (useradd -o) instead of failing the build.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01GWHBALtjHVd176YddWc9YP
+
+Signed-off-by: Jose Salamanca <jose.salamancacoy@gmail.com>
+
+
 ## v0.3.0 (2026-07-04)
 
 ### Features
