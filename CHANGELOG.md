@@ -1,6 +1,26 @@
 # CHANGELOG
 
 
+## v0.3.0 (2026-07-04)
+
+### Features
+
+- **cli**: Add versions, update and adopt; polish list inventory
+  ([`534ed68`](https://github.com/mad-core/mad-cli/commit/534ed68a3dd3cfe0c074ed7311bdddb36109c9db))
+
+Add `mad versions [INSTANCE]` (pinned / installed / latest-on-PyPI plus an update-available column),
+  `mad update INSTANCE [--version X]` (re-pins MAD_VERSION in the .env and rebuilds from scratch),
+  and `mad adopt` (migrates the legacy single-instance layout into instances/<name>/). Refresh `mad
+  list` to Name / Port / State / Health / Version with best-effort state and health parsed from
+  `docker compose ps`.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_01GWHBALtjHVd176YddWc9YP
+
+Signed-off-by: Jose Salamanca <jose.salamancacoy@gmail.com>
+
+
 ## v0.2.0 (2026-07-04)
 
 ### Features
